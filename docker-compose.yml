@@ -37,13 +37,14 @@ services:
   ## ────────────────────────────────────
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
     environment:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
       # INTERNAL listener for in‑container apps, EXTERNAL for your host/browser UIs
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: |
+      KAFKA_ADVERTISED_LISTENERS:
         INTERNAL://kafka:9092,
         EXTERNAL://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -87,6 +88,46 @@ services:
     ports:
       - "8086:8086"
 
+
+  # ────────────────────────────────────
+  # Kafka Connect (for sinking video.enriched → InfluxDB)
+  # ────────────────────────────────────
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.5.0
+    container_name: kafka-connect
+    depends_on:
+      - kafka
+      - influxdb
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS:           kafka:9092
+      CONNECT_REST_PORT:                   8083
+      CONNECT_REST_ADVERTISED_HOST_NAME:   kafka-connect
+      CONNECT_REST_ADVERTISED_PORT:        8083
+      CONNECT_GROUP_ID:                    "connect-cluster"
+      CONNECT_CONFIG_STORAGE_TOPIC:        "connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC:        "connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC:        "connect-status"
+      CONNECT_KEY_CONVERTER:               "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER:             "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE:   "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:  1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:  1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:  1
+
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    restart: on-failure
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+
   ## ────────────────────────────────────
   ## Worker (Python)
   ## ────────────────────────────────────
@@ -111,9 +152,9 @@ services:
     env_file:
       - .env
     depends_on:
-      - kafka
       - influxdb
       - redis
+      - kafka
 
   ingestor:
     build:
@@ -127,6 +168,27 @@ services:
     depends_on:
       - kafka
 
+  broker:
+    build:
+      context: .
+      dockerfile: broker/broker.dockerfile
+    container_name: broker
+    env_file:
+      - .env
+    depends_on:
+      - kafka
+
+  dashboard-api:
+    build:
+      context: .
+      dockerfile: dashboard/dashboard.dockerfile
+    container_name: dashboard-api
+    env_file:
+      - .env
+    depends_on:
+      - influxdb
+    ports:
+      - "8081:8081"
   ## ────────────────────────────────────
   ## Conduktor Console & its DB
   ## ────────────────────────────────────
