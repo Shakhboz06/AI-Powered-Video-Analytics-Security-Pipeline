@@ -1,15 +1,52 @@
 package middleware
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+	"strings"
+	"video-analytics-pipe/dashboard/internal/auth"
+	"video-analytics-pipe/dashboard/internal/store"
 
-func AuthByAPIKey(key string) gin.HandlerFunc{
-	return func(ctx *gin.Context){
+	"github.com/gin-gonic/gin"
+)
+
+func AuthByAPIKey(key string) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
 		headerkey := ctx.GetHeader("X-API-Key")
-		if headerkey != key{
+		if headerkey != key {
 			ctx.AbortWithStatusJSON(401, gin.H{"error": "invalid API key"})
-			return 
+			return
 		}
 
+		ctx.Next()
+	}
+}
+
+func AuthTokenMiddleware(s *store.UserStore, auth *auth.JWTAuthenticator) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		authHeader := ctx.GetHeader("Authorization")
+		if authHeader == "" {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "not Authorized, missing credentials"})
+			return
+		}
+
+		tokenStr := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+
+		userID, token_ver, err := auth.ValidateToken(tokenStr)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			return
+		}
+
+		version, err := s.GetUserTokenVersion(ctx, userID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve used id"})
+		}
+
+		if version.Version != token_ver{
+			ctx.AbortWithStatusJSON(401, gin.H{"error": "token revoked, log again"})
+            return
+		}
+		ctx.Set("userID", userID)
 		ctx.Next()
 	}
 }

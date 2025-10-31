@@ -1,0 +1,65 @@
+# .dockerignore
+# videos
+dev/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+**/frontend/
+
+# Git
+.git/
+.gitignore
+
+# Dependencies
+**/node_modules/
+**/vendor/
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+
+# Build artifacts
+**/bin/
+**/obj/
+**/dist/
+**/build/
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+*.db
+
+# Documentation
+*.md
+docs/
+
+# Test files
+**/test/
+**/tests/
+**/*_test.go
+**/*_test.py
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
