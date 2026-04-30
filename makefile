@@ -25,7 +25,7 @@ restart: down up
 
 build:
 	@echo "🛠️  Building Docker images..."
-	$(Docker) build
+	$(Docker) build -d
 
 logs:
 ifndef SERVICE
@@ -48,15 +48,9 @@ run-ingestor:
 	@echo "▶ Running Ingestor locally..."
 	cd ingestor && go run main.go
 
-run-broker:
-	@echo "▶ Running Broker locally..."
-	cd broker && go run main.go
-
 run-dashboard:
 	@echo "▶ Running Dashboard locally..."
 	cd dashboard && go run main.go
-
-## Cleanup everything (use with caution!)
 
 clean:
 	@echo "🧹 Removing all containers, networks, volumes, and images..."

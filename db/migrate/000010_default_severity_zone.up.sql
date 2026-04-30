@@ -1,0 +1,2 @@
+ALTER TABLE zones ADD 
+COLUMN default_severity VARCHAR(20) NOT NULL DEFAULT 'info';

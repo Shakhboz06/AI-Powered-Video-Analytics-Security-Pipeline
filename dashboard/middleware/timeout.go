@@ -9,6 +9,11 @@ import (
 
 func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		switch c.FullPath(){
+		case "/api/v1/alerts/stream", "/healthz":
+			c.Next()
+			return 
+		}
 		ctx, cancel := context.WithTimeout(c.Request.Context(), d)
 		defer cancel()
 
@@ -19,10 +24,4 @@ func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 	}
 }
 
-// … in main()
-// r := gin.Default()
-// r.Use(TimeoutMiddleware(2 * time.Second))
 
-// api := r.Group("/api/v1", auth)
-// api.GET("/cameras", getCameras(queryAPI, bucket))
-// …

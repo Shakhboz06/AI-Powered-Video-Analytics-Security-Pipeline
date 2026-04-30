@@ -61,6 +61,7 @@ func (s *UserStore) Create(ctx context.Context, user *Users) (*Users, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	
 	err := s.db.QueryRowContext(ctx, query, user.Username, user.Email, user.Password.hash).Scan(&user.ID, &user.Username, &user.Email)
 	if err != nil {
 		return nil, err

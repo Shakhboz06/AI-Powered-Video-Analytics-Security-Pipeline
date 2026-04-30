@@ -12,7 +12,8 @@ import (
 func AuthByAPIKey(key string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		headerkey := ctx.GetHeader("X-API-Key")
-		if headerkey != key {
+		queryKey := ctx.Query("api_key")
+		if headerkey != key && queryKey != key {
 			ctx.AbortWithStatusJSON(401, gin.H{"error": "invalid API key"})
 			return
 		}
@@ -39,12 +40,13 @@ func AuthTokenMiddleware(s *store.UserStore, auth *auth.JWTAuthenticator) gin.Ha
 
 		version, err := s.GetUserTokenVersion(ctx, userID)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve used id"})
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "could not retrieve used id"})
+			return
 		}
 
-		if version.Version != token_ver{
-			ctx.AbortWithStatusJSON(401, gin.H{"error": "token revoked, log again"})
-            return
+		if version.Version != token_ver {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token revoked, log again"})
+			return
 		}
 		ctx.Set("userID", userID)
 		ctx.Next()

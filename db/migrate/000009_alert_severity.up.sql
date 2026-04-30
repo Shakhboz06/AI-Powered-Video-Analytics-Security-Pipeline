@@ -1,0 +1,2 @@
+ALTER TABLE alerts 
+ADD COLUMN severity VARCHAR(20) NOT NULL DEFAULT 'info';

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"video-analytics-pipe/dashboard/internal/auth"
 	"video-analytics-pipe/dashboard/internal/store"
+
 	"github.com/gin-gonic/gin"
 )
 

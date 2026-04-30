@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS cameras(
+    camera_id BIGSERIAL NOT NULL,
+    camera_name VARCHAR(255) NOT NULL,
+    video_source VARCHAR(255) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

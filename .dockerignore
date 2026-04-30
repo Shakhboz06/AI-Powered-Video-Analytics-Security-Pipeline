@@ -42,7 +42,7 @@ dev/
 *.log
 *.sql
 *.sqlite
-*.db
+# *.db
 
 # Documentation
 *.md
