@@ -39,7 +39,7 @@ const (
 )
 
 func (s *ZoneTrackerState) UpdateState(current map[int64]map[int64]Alert, zonesByID map[int64]Zone, now time.Time) []Alert {
-
+	
 	var alerts []Alert
 	newState := map[int64]map[int64]TrackerRecorder{}
 

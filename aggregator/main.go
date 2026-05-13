@@ -25,6 +25,7 @@ type Detections struct {
 type DetectionResult struct {
 	Camera     string       `json:"camera"`
 	Detections []Detections `json:"detections"`
+	Keypoints  []Keypoints  `json:"keypoints"`
 	LatencyMS  float64      `json:"latency_ms"`
 	RecordedAt int64        `json:"timestamp"`
 }
@@ -94,6 +95,7 @@ func main() {
 	detStore := NewDetStore(database)
 	zoneStore := NewZoneStore(database)
 	alertStore := NewAlertStore(database)
+	keyPointStore := NewKeypointStore(database)
 	zoneCache := NewZoneCache()
 	if err := zoneCache.BackgroundRefresh(ctx, 30*time.Second, zoneStore); err != nil {
 		log.Fatal(err)
@@ -101,6 +103,8 @@ func main() {
 
 	intrusionState := NewZoneTrackerState()
 	runningDetector := NewRunningDetector()
+	fallingDetector := NewFallDetector()
+	brandishingDetector := NewBrandishingDetector()
 
 	for {
 		m, err := reader.ReadMessage(ctx)
@@ -140,6 +144,7 @@ func main() {
 			log.Printf("failed to marshal obj: %v", err)
 			return
 		}
+		
 		var detections TabDetection
 
 		detections = TabDetection{
@@ -160,6 +165,13 @@ func main() {
 			log.Printf("failed to insert trackings: %v", err)
 			return
 		}
+
+		
+		if err := keyPointStore.CreateKeyPoints(ctx, det.Camera, det.RecordedAt, det.Keypoints); err != nil{
+			log.Printf("failed to insert keypoints: %v", err)
+			return
+		}
+
 
 		zones := zoneCache.Get(det.Camera)
 
@@ -213,6 +225,11 @@ func main() {
 		runningAlerts := runningDetector.DetectRunning(det.Camera, det.Detections, detections.RecordedAt)
 		alerts = append(alerts, runningAlerts...)
 
+		fallingAlerts := fallingDetector.DetectFall(det.Camera, det.Detections, det.Keypoints, detections.RecordedAt)
+		alerts = append(alerts, fallingAlerts...)
+
+		brandishingAlerts := brandishingDetector.DetectBrandishing(det.Camera, det.Detections, det.Keypoints, detections.RecordedAt)
+		alerts = append(alerts, brandishingAlerts...)
 		if len(alerts) > 0 {
 			if err := alertStore.Create(ctx, alerts); err != nil {
 				log.Printf("failed to insert alerts: %v", err)
@@ -221,6 +238,7 @@ func main() {
 			publishAlertsToRedis(ctx, rdb, alerts)
 
 		}
+
 
 		log.Printf("Wrote to TimeSeriesDB: %s lat=%.1fms",
 			det.Camera, det.LatencyMS,

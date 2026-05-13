@@ -11,7 +11,6 @@ import httpx
 # expects KAFKA_BROKER, KAFKA_ANALYSIS_TOPIC, VIDEO_SOURCE, CAMERA_ID, FPS
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
-
 BROKER       = os.getenv("KAFKA_BROKER",       "kafka:9092")
 TOPIC        = os.getenv("KAFKA_ANALYSIS_TOPIC","video.analysis")
 CAMERA_URL      = os.getenv("CAMERA_URL", "")   

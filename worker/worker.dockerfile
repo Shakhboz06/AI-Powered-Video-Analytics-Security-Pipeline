@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from ultralytics import YOLO; YOLO('yolo11n.pt')"
 
 COPY worker.py .
+COPY models/ /app/models/
 
 
 ENTRYPOINT ["python", "-u", "worker.py"]
