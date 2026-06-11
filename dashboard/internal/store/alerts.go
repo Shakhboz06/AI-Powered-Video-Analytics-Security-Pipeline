@@ -99,13 +99,13 @@ func (s *AlertStore) UpdateStatus(ctx context.Context, id int64, status string) 
 
 	query := `
 		WITH updated AS (
-    	UPDATE alerts 
+    	UPDATE alerts
     	SET status = $2
     	WHERE id = $1
-    	RETURNING id, camera, zone_id, tracker_id, bound_box, label, status, recorded_at, alert_type, severity,
+    	RETURNING id, camera, zone_id, tracker_id, bound_box, label, status, recorded_at, alert_type, severity
 		)
 		SELECT u.id, u.camera, u.zone_id, z.name AS zone_name,
-    		u.tracker_id, u.bound_box, u.label, u.status, u.recorded_at, u.severity
+    		u.tracker_id, u.bound_box, u.label, u.status, u.recorded_at, u.alert_type, u.severity
 		FROM updated u
 		LEFT JOIN zones z ON u.zone_id = z.id;
 	`
