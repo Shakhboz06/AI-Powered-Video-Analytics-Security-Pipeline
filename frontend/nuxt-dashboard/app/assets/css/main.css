@@ -907,26 +907,26 @@ span.flatpickr-weekday,
       inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
       0 0 0 1px rgba(0, 0, 0, 0.2),
       0 24px 50px -28px rgba(0, 0, 0, 0.88);
+    isolation: isolate;
+  }
+  .app-card > * {
+    position: relative;
+    z-index: 1;
   }
   .app-card::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    padding: 1px;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
     background: linear-gradient(
       145deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(255, 255, 255, 0.02) 35%,
-      rgba(45, 212, 191, 0.12) 65%,
-      rgba(129, 140, 248, 0.08) 100%
+      rgba(255, 255, 255, 0.06) 0%,
+      transparent 40%,
+      rgba(45, 212, 191, 0.04) 100%
     );
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0.65;
   }
   .app-card-hover {
     @apply transition-all duration-300 ease-out;
@@ -1087,7 +1087,7 @@ span.flatpickr-weekday,
   }
 
   .kpi-card {
-    @apply app-card app-card-hover relative overflow-hidden p-4;
+    @apply relative overflow-hidden p-4 transition-all duration-300 ease-out;
   }
   .kpi-card::after {
     content: "";
@@ -1151,20 +1151,20 @@ span.flatpickr-weekday,
     @apply rounded-xl border px-4 py-3 text-sm;
   }
   .app-banner-error {
-    @apply app-banner border-red-900/50 bg-red-950/30 text-red-300;
+    @apply rounded-xl border px-4 py-3 text-sm border-red-900/50 bg-red-950/30 text-red-300;
   }
   .app-banner-warning {
-    @apply app-banner border-amber-900/50 bg-amber-950/20 text-amber-200;
+    @apply rounded-xl border px-4 py-3 text-sm border-amber-900/50 bg-amber-950/20 text-amber-200;
   }
   .app-banner-success {
-    @apply app-banner border-teal-800/50 bg-teal-950/20 text-teal-200;
+    @apply rounded-xl border px-4 py-3 text-sm border-teal-800/50 bg-teal-950/20 text-teal-200;
   }
 
   .btn-sm {
     @apply rounded-lg px-3 py-1.5 text-xs font-medium;
   }
   .btn-ghost-sm {
-    @apply btn-sm border transition-colors;
+    @apply rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors;
     border-color: var(--app-border);
     background-color: rgba(255, 255, 255, 0.02);
     color: #d1d5db;
@@ -1175,7 +1175,7 @@ span.flatpickr-weekday,
     color: #f3f4f6;
   }
   .btn-danger-sm {
-    @apply btn-sm border border-red-900/50 text-red-300 transition-colors;
+    @apply rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors border-red-900/50 text-red-300;
     background-color: rgba(127, 29, 29, 0.15);
   }
   .btn-danger-sm:hover {
@@ -1221,7 +1221,7 @@ span.flatpickr-weekday,
   }
 
   .pipeline-card {
-    @apply app-card app-card-hover relative p-5;
+    @apply relative p-5 transition-all duration-300 ease-out;
   }
   @media (min-width: 1024px) {
     .pipeline-card:not(:last-child)::after {
@@ -1240,14 +1240,14 @@ span.flatpickr-weekday,
     position: absolute;
     inset: -12px;
     border-radius: inherit;
-    border: 1px solid rgba(45, 212, 191, 0.2);
-    animation: app-orbit 8s linear infinite;
+    border: 1px solid rgba(45, 212, 191, 0.25);
+    pointer-events: none;
+    animation: app-glow-pulse 3s ease-in-out infinite;
   }
   .orbit-ring-2 {
     inset: -24px;
     border-color: rgba(129, 140, 248, 0.15);
-    animation-duration: 12s;
-    animation-direction: reverse;
+    animation-delay: -1.5s;
   }
 
   .stagger-in > * {

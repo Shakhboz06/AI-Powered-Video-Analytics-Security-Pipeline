@@ -58,28 +58,28 @@
     <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="kpi-card">
+      <div class="kpi-card app-card app-card-hover">
         <p class="app-label">Avg latency</p>
         <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
           <AnimatedNumber v-if="stats.avg != null" :value="stats.avg" :decimals="2" /><span v-else>—</span>
         </p>
         <div v-if="latencySpark.length > 1" class="mt-2"><Sparkline :data="latencySpark" color="#2dd4bf" /></div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card app-card app-card-hover">
         <p class="app-label">P95 latency</p>
         <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
           <AnimatedNumber v-if="stats.p95 != null" :value="stats.p95" :decimals="2" /><span v-else>—</span>
         </p>
         <div v-if="latencySpark.length > 1" class="mt-2"><Sparkline :data="latencySpark" color="#22d3ee" /></div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card app-card app-card-hover">
         <p class="app-label">P99 latency</p>
         <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
           <AnimatedNumber v-if="stats.p99 != null" :value="stats.p99" :decimals="2" /><span v-else>—</span>
         </p>
         <div v-if="latencySpark.length > 1" class="mt-2"><Sparkline :data="latencySpark" color="#818cf8" /></div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi-card app-card app-card-hover">
         <p class="app-label">High-latency frames</p>
         <p class="mt-2 text-2xl font-semibold tabular-nums text-red-300">
           <AnimatedNumber v-if="stats.incidentCount != null" :value="stats.incidentCount" /><span v-else>—</span>

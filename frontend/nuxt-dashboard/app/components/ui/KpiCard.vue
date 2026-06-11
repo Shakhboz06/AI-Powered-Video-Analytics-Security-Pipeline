@@ -1,5 +1,5 @@
 <template>
-  <div class="kpi-card" :class="cardClass">
+  <div class="app-card app-card-hover kpi-card" :class="cardClass">
     <div class="flex items-center gap-2">
       <div v-if="iconPath" class="kpi-card-icon" :class="iconWrapClass">
         <svg class="h-4 w-4" :class="accentClass" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true">

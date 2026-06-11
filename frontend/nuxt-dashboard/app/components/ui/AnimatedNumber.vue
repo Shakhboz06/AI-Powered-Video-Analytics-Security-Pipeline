@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{
   duration: 700,
 })
 
-const current = ref(0)
+const current = ref(props.value)
 let raf: number | null = null
 
 const display = computed(() => {

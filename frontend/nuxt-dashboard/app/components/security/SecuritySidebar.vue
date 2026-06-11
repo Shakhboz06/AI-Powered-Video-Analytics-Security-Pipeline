@@ -15,7 +15,9 @@
   >
     <!-- Brand -->
     <div class="flex h-16 items-center justify-between px-5">
-      <AppBrand to="/dashboard" :show-tagline="true" @click="closeSidebar" />
+      <div class="min-w-0" @click="closeSidebar">
+        <AppBrand to="/dashboard" :show-tagline="true" />
+      </div>
       <button
         type="button"
         class="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-gray-200 lg:hidden"

@@ -65,7 +65,7 @@
     <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div v-for="card in summaryCards" :key="card.label" class="kpi-card">
+      <div v-for="card in summaryCards" :key="card.label" class="kpi-card app-card app-card-hover">
         <p class="app-label">{{ card.label }}</p>
         <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
           <AnimatedNumber v-if="card.num != null" :value="card.num" :decimals="card.decimals" />

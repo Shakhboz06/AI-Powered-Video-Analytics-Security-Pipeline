@@ -31,7 +31,7 @@ const props = withDefaults(defineProps<{
   height: 36,
 })
 
-const gradId = `spark-${Math.random().toString(36).slice(2, 9)}`
+const gradId = useId()
 
 const points = computed(() => {
   const d = props.data?.filter((n) => Number.isFinite(n)) ?? []

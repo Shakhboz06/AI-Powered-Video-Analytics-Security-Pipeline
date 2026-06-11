@@ -68,7 +68,7 @@
       <div
         v-for="card in statCards"
         :key="card.key"
-        class="kpi-card"
+        class="kpi-card app-card app-card-hover"
         :class="card.cardClass"
       >
         <div class="flex items-center gap-2">

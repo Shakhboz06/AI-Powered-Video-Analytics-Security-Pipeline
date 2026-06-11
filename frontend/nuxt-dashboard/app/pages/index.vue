@@ -107,7 +107,7 @@
         <p class="mx-auto mt-3 max-w-2xl text-gray-400">A streaming pipeline ingests video, runs AI inference, and surfaces actionable intelligence in your dashboard.</p>
       </div>
       <div class="stagger-in mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div v-for="(step, i) in pipeline" :key="step.title" class="pipeline-card">
+        <div v-for="(step, i) in pipeline" :key="step.title" class="app-card app-card-hover pipeline-card">
           <span class="app-gradient-text text-2xl font-bold tabular-nums">{{ String(i + 1).padStart(2, '0') }}</span>
           <h3 class="mt-3 text-sm font-semibold text-gray-100">{{ step.title }}</h3>
           <p class="mt-1.5 text-sm text-gray-500">{{ step.desc }}</p>
