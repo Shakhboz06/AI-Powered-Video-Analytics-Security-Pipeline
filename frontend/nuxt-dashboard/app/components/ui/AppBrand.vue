@@ -1,7 +1,7 @@
 <template>
   <NuxtLink v-if="to" :to="to" class="group inline-flex items-center gap-2.5">
     <span
-      class="grid place-items-center rounded-xl text-[#04201c] shadow-lg transition-transform duration-300 group-hover:scale-105"
+      class="relative grid place-items-center rounded-xl text-[#04201c] shadow-lg transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_24px_-4px_rgba(45,212,191,0.4)]"
       :class="markClass"
       style="background-image: linear-gradient(120deg, #2dd4bf, #22d3ee)"
     >
@@ -17,7 +17,7 @@
   </NuxtLink>
   <div v-else class="group inline-flex items-center gap-2.5">
     <span
-      class="grid place-items-center rounded-xl text-[#04201c] shadow-lg transition-transform duration-300 group-hover:scale-105"
+      class="relative grid place-items-center rounded-xl text-[#04201c] shadow-lg transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_24px_-4px_rgba(45,212,191,0.4)]"
       :class="markClass"
       style="background-image: linear-gradient(120deg, #2dd4bf, #22d3ee)"
     >

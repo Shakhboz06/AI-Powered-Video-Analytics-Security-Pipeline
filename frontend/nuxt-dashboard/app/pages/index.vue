@@ -6,9 +6,9 @@
       <nav class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 md:px-8">
         <AppBrand to="/" :show-tagline="false" />
         <div class="hidden items-center gap-8 text-sm text-gray-400 md:flex">
-          <a href="#pipeline" class="transition-colors hover:text-gray-100">How it works</a>
-          <a href="#capabilities" class="transition-colors hover:text-gray-100">Detection</a>
-          <a href="#stats" class="transition-colors hover:text-gray-100">Platform</a>
+          <a href="#pipeline" class="transition-colors hover:text-gray-100" @click.prevent="smoothScroll('#pipeline')">How it works</a>
+          <a href="#capabilities" class="transition-colors hover:text-gray-100" @click.prevent="smoothScroll('#capabilities')">Detection</a>
+          <a href="#stats" class="transition-colors hover:text-gray-100" @click.prevent="smoothScroll('#stats')">Platform</a>
         </div>
         <div class="flex items-center gap-2.5">
           <template v-if="isAuthenticated">
@@ -18,9 +18,37 @@
             <NuxtLink to="/auth/login" class="btn-ghost hidden sm:inline-flex">Sign in</NuxtLink>
             <NuxtLink to="/auth/register" class="btn-primary">Get started</NuxtLink>
           </template>
+          <!-- Mobile hamburger -->
+          <button class="ml-2 grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-gray-400 transition-colors hover:text-gray-100 md:hidden" @click="toggleMobileMenu" aria-label="Toggle menu">
+            <svg v-if="!mobileMenuOpen" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+            <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
       </nav>
     </header>
+
+    <!-- Mobile menu drawer overlay -->
+    <Transition name="mobile-menu">
+      <div v-if="mobileMenuOpen" class="fixed inset-0 z-40 md:hidden" @click.self="mobileMenuOpen = false">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div class="absolute right-0 top-0 flex h-full w-72 flex-col gap-2 border-l border-white/10 bg-[#0c1117]/95 p-6 pt-20 shadow-2xl backdrop-blur-xl">
+          <button class="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-lg text-gray-400 transition-colors hover:text-gray-100" @click="mobileMenuOpen = false" aria-label="Close menu">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          <a href="#pipeline" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click.prevent="smoothScroll('#pipeline'); mobileMenuOpen = false">How it works</a>
+          <a href="#capabilities" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click.prevent="smoothScroll('#capabilities'); mobileMenuOpen = false">Detection</a>
+          <a href="#stats" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click.prevent="smoothScroll('#stats'); mobileMenuOpen = false">Platform</a>
+          <hr class="my-3 border-white/10" />
+          <template v-if="isAuthenticated">
+            <NuxtLink to="/dashboard" class="btn-primary w-full text-center" @click="mobileMenuOpen = false">Open Dashboard</NuxtLink>
+          </template>
+          <template v-else>
+            <NuxtLink to="/auth/login" class="btn-ghost w-full text-center" @click="mobileMenuOpen = false">Sign in</NuxtLink>
+            <NuxtLink to="/auth/register" class="btn-primary w-full text-center" @click="mobileMenuOpen = false">Get started</NuxtLink>
+          </template>
+        </div>
+      </div>
+    </Transition>
 
     <section class="relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-10 md:px-8 md:pt-20">
       <div class="grid items-center gap-12 lg:grid-cols-2">
@@ -66,8 +94,17 @@
               <span class="flex items-center gap-2 text-xs font-medium text-gray-300">
                 <span class="live-dot h-2 w-2 rounded-full bg-red-500" /> LIVE · CAM-01
               </span>
-              <span class="font-mono text-[11px] text-gray-500">{{ clock }}</span>
+              <!-- REC indicator -->
+              <span class="flex items-center gap-1.5">
+                <span class="flex items-center gap-1 rounded bg-red-600/80 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white rec-pulse">
+                  <span class="rec-dot inline-block h-1.5 w-1.5 rounded-full bg-white" />
+                  REC
+                </span>
+                <span class="font-mono text-[11px] text-gray-500">{{ clock }}</span>
+              </span>
             </div>
+            <!-- Gradient line under LIVE · CAM-01 -->
+            <div class="mb-2 h-px w-full" style="background: linear-gradient(to right, transparent, rgba(45,212,191,0.5), rgba(251,146,60,0.3), transparent)" />
             <div class="monitor-feed relative aspect-video overflow-hidden rounded-xl">
               <div class="absolute inset-0" style="background: radial-gradient(120% 120% at 30% 10%, #14202b, #0a0e13 70%)" />
               <div class="absolute inset-0 opacity-40" style="background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 28px 28px" />
@@ -135,8 +172,20 @@
     <section id="stats" class="relative z-10 mx-auto max-w-7xl px-5 py-12 md:px-8">
       <div class="app-card grid gap-8 p-8 sm:grid-cols-2 lg:grid-cols-4">
         <div v-for="s in stats" :key="s.label" class="text-center">
-          <p class="app-gradient-text text-4xl font-bold tracking-tight">{{ s.value }}</p>
+          <p class="app-gradient-text text-4xl font-bold tracking-tight">{{ s.displayValue }}</p>
           <p class="mt-1 text-sm text-gray-400">{{ s.label }}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trusted by / social proof -->
+    <section class="relative z-10 mx-auto max-w-7xl px-5 py-12 md:px-8">
+      <div class="text-center">
+        <p class="text-sm font-medium uppercase tracking-widest text-gray-500">Trusted by security teams</p>
+      </div>
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-10">
+        <div v-for="company in trustedCompanies" :key="company" class="flex h-12 items-center rounded-lg border border-white/5 bg-white/[0.03] px-6 opacity-50 transition-opacity hover:opacity-80">
+          <span class="text-sm font-semibold tracking-wide text-gray-400">{{ company }}</span>
         </div>
       </div>
     </section>
@@ -159,8 +208,17 @@
     <footer class="relative z-10 border-t" style="border-color: var(--app-border)">
       <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 py-8 text-sm text-gray-500 md:flex-row md:px-8">
         <AppBrand size="sm" :show-tagline="false" />
-        <p>© {{ year }} Security Ops · Video Analytics Platform</p>
+        <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <p>&copy; {{ year }} Security Ops &middot; Video Analytics Platform</p>
+          <span class="inline-flex items-center gap-1 rounded-full border border-teal-500/20 bg-teal-950/30 px-2.5 py-0.5 text-[11px] font-medium text-teal-300">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+            Built with AI
+          </span>
+        </div>
         <div class="flex items-center gap-5">
+          <a href="#" class="transition-colors hover:text-gray-300">Privacy</a>
+          <a href="#" class="transition-colors hover:text-gray-300">Terms</a>
+          <a href="#" class="transition-colors hover:text-gray-300">API Docs</a>
           <NuxtLink to="/dashboard" class="transition-colors hover:text-gray-300">Dashboard</NuxtLink>
           <NuxtLink to="/auth/login" class="transition-colors hover:text-gray-300">Sign in</NuxtLink>
       </div>
@@ -187,12 +245,93 @@ const year = new Date().getFullYear()
 
 const trustBadges = ['Sub-second detection', 'Multi-camera fleet', '24/7 alerting', 'ML + rules hybrid']
 
+const trustedCompanies = ['Apex Security', 'DefendCo', 'VisionGuard', 'SafeNet Corp', 'SentryAI']
+
 const clock = ref('--:--:--')
 let timer: ReturnType<typeof setInterval> | null = null
+
+// Mobile menu state
+const mobileMenuOpen = ref(false)
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+// Smooth scroll helper
+function smoothScroll(selector: string) {
+  document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth' })
+}
+
+// Animated stats
+interface StatItem {
+  numericValue: number
+  prefix: string
+  suffix: string
+  label: string
+  displayValue: string
+}
+
+const stats = reactive<StatItem[]>([
+  { numericValue: 7, prefix: '', suffix: '+', label: 'Threat types detected', displayValue: '0+' },
+  { numericValue: 300, prefix: '<', suffix: 'ms', label: 'Inference latency', displayValue: '<0ms' },
+  { numericValue: 24, prefix: '', suffix: '/7', label: 'Continuous monitoring', displayValue: '0/7' },
+  { numericValue: 0, prefix: '', suffix: '∞', label: 'Cameras supported', displayValue: '∞' },
+])
+
+let statsAnimated = false
+
+function animateStats() {
+  if (statsAnimated) return
+  statsAnimated = true
+
+  const duration = 1500
+  const startTime = performance.now()
+
+  function update(currentTime: number) {
+    const elapsed = currentTime - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    // Ease out cubic
+    const eased = 1 - Math.pow(1 - progress, 3)
+
+    for (const s of stats) {
+      if (s.numericValue === 0) {
+        // Special case for infinity symbol - always show it
+        s.displayValue = s.suffix
+      } else {
+        const current = Math.round(eased * s.numericValue)
+        s.displayValue = `${s.prefix}${current}${s.suffix}`
+      }
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(update)
+    }
+  }
+
+  requestAnimationFrame(update)
+}
+
 onMounted(() => {
+  // Clock
   const tick = () => { clock.value = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
   tick()
   timer = setInterval(tick, 1000)
+
+  // Stats intersection observer
+  const statsEl = document.querySelector('#stats')
+  if (statsEl) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            animateStats()
+            observer.disconnect()
+          }
+        }
+      },
+      { threshold: 0.3 },
+    )
+    observer.observe(statsEl)
+  }
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
 
@@ -211,11 +350,42 @@ const features = [
   { title: 'Weapon & abandoned objects', desc: 'Flag brandished weapons and unattended bags left stationary in a scene.', badge: 'bg-violet-500/15 text-violet-300', icon: ['M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'] },
   { title: 'Live analytics & alerts', desc: 'Streaming dashboards, latency health, and instant acknowledge/resolve workflows.', badge: 'bg-teal-500/15 text-teal-300', icon: ['M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'] },
 ]
-
-const stats = [
-  { value: '7+', label: 'Threat types detected' },
-  { value: '<300ms', label: 'Inference latency' },
-  { value: '24/7', label: 'Continuous monitoring' },
-  { value: '∞', label: 'Cameras supported' },
-]
 </script>
+
+<style scoped>
+/* REC indicator pulsing animation */
+.rec-pulse {
+  animation: rec-pulse-anim 1.5s ease-in-out infinite;
+}
+.rec-dot {
+  animation: rec-dot-blink 1.5s ease-in-out infinite;
+}
+@keyframes rec-pulse-anim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@keyframes rec-dot-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* Mobile menu transitions */
+.mobile-menu-enter-active,
+.mobile-menu-leave-active {
+  transition: opacity 0.25s ease;
+}
+.mobile-menu-enter-active > div:last-child,
+.mobile-menu-leave-active > div:last-child {
+  transition: transform 0.25s ease;
+}
+.mobile-menu-enter-from,
+.mobile-menu-leave-to {
+  opacity: 0;
+}
+.mobile-menu-enter-from > div:last-child {
+  transform: translateX(100%);
+}
+.mobile-menu-leave-to > div:last-child {
+  transform: translateX(100%);
+}
+</style>
