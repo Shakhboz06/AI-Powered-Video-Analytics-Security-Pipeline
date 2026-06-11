@@ -88,8 +88,38 @@
           :last-updated="lastUpdatedFormatted"
         />
         <ClassDonutChart :total-objects="liveSnapshot?.total_objects ?? null" />
+
+        <!-- Quick Activity Feed -->
+        <div class="app-card overflow-hidden">
+          <div class="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
+            <h3 class="app-section-title">Recent Activity</h3>
+            <NuxtLink to="/alerts" class="text-xs text-teal-300 transition-colors hover:text-teal-200 hover:underline">
+              View all alerts
+            </NuxtLink>
+          </div>
+          <div v-if="recentActivity.length" class="divide-y divide-white/[0.06]">
+            <div
+              v-for="(event, i) in recentActivity"
+              :key="i"
+              class="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.02]"
+            >
+              <span
+                class="h-2 w-2 shrink-0 rounded-full"
+                :class="event.dotClass"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm text-gray-300">{{ event.text }}</p>
+                <p class="text-xs text-gray-500">{{ event.time }}</p>
+              </div>
+              <span class="shrink-0 text-xs font-mono tabular-nums text-gray-500">{{ event.camera }}</span>
+            </div>
+          </div>
+          <div v-else class="px-5 py-8 text-center text-sm text-gray-500">
+            No recent activity. Detection events will appear here as they stream in.
+          </div>
+        </div>
       </div>
-      <div class="xl:sticky xl:top-24 xl:self-start">
+      <div class="space-y-6 xl:sticky xl:top-24 xl:self-start">
         <CameraStatusList
           :rows="statusRows"
           :selected-camera="selectedCamera"
@@ -97,6 +127,41 @@
           :error="statusError"
           @select="selectedCamera = $event"
         />
+
+        <!-- Quick Links Card -->
+        <div class="app-card p-4">
+          <h3 class="app-section-title mb-3">Quick Actions</h3>
+          <div class="grid grid-cols-2 gap-2">
+            <NuxtLink
+              to="/cameras"
+              class="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-sm text-gray-300 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.04] hover:text-gray-100"
+            >
+              <svg class="h-4 w-4 shrink-0 text-teal-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              Cameras
+            </NuxtLink>
+            <NuxtLink
+              to="/zones"
+              class="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-sm text-gray-300 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.04] hover:text-gray-100"
+            >
+              <svg class="h-4 w-4 shrink-0 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12l3.5-5h7L19 12l-3.5 5h-7L5 12z" /></svg>
+              Zones
+            </NuxtLink>
+            <NuxtLink
+              to="/analytics"
+              class="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-sm text-gray-300 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.04] hover:text-gray-100"
+            >
+              <svg class="h-4 w-4 shrink-0 text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z" /></svg>
+              Analytics
+            </NuxtLink>
+            <NuxtLink
+              to="/health"
+              class="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-sm text-gray-300 transition-all duration-200 hover:border-white/10 hover:bg-white/[0.04] hover:text-gray-100"
+            >
+              <svg class="h-4 w-4 shrink-0 text-emerald-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+              Health
+            </NuxtLink>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -179,6 +244,39 @@ const avgLatency = computed(() => {
   const vals = statusRows.value.map(r => r.latencyMs).filter((v): v is number => v != null)
   if (!vals.length) return null
   return vals.reduce((a, b) => a + b, 0) / vals.length
+})
+
+interface ActivityEvent {
+  text: string
+  time: string
+  camera: string
+  dotClass: string
+}
+
+const recentActivity = computed<ActivityEvent[]>(() => {
+  const events: ActivityEvent[] = []
+  for (const row of statusRows.value) {
+    if (row.recordedAtIso) {
+      const age = Date.now() - new Date(row.recordedAtIso).getTime()
+      const isOnline = age < 120_000
+      events.push({
+        text: isOnline
+          ? `${row.totalDetections ?? 0} detections at ${row.latencyMs?.toFixed(0) ?? '?'}ms latency`
+          : `Camera went stale ${Math.floor(age / 60_000)}m ago`,
+        time: row.recordedAt ?? '',
+        camera: row.camera,
+        dotClass: isOnline ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-amber-400',
+      })
+    } else {
+      events.push({
+        text: 'No detection data available',
+        time: 'Never',
+        camera: row.camera,
+        dotClass: 'bg-gray-600',
+      })
+    }
+  }
+  return events.slice(0, 8)
 })
 
 const kpiCards = computed(() => [

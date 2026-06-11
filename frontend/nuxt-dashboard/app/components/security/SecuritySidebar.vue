@@ -56,6 +56,20 @@
           class="live-dot flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold tabular-nums text-white"
         >{{ newAlertCount > 99 ? '99+' : newAlertCount }}</span>
       </NuxtLink>
+
+      <div class="mx-2 my-4 h-px" style="background-image: linear-gradient(to right, transparent, var(--app-border), transparent)" />
+
+      <p class="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600">Shortcuts</p>
+      <div class="space-y-0.5 px-3">
+        <div class="flex items-center justify-between py-1.5 text-xs text-gray-500">
+          <span>Command palette</span>
+          <kbd class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{{ metaKey }}K</kbd>
+        </div>
+        <div class="flex items-center justify-between py-1.5 text-xs text-gray-500">
+          <span>Toggle theme</span>
+          <kbd class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">{{ metaKey }}D</kbd>
+        </div>
+      </div>
     </nav>
 
     <!-- Footer / user -->
@@ -131,6 +145,11 @@ const navItems = [
 
 const newAlertCount = ref(0)
 let alertStream: EventSource | null = null
+
+const metaKey = ref('Ctrl+')
+onMounted(() => {
+  if (navigator.platform.toLowerCase().includes('mac')) metaKey.value = '⌘'
+})
 
 const initials = computed(() => {
   const name = auth.user?.username || auth.user?.email || 'OP'

@@ -1,11 +1,14 @@
 <template>
   <article
-    class="alert-card-premium app-card app-card-hover cursor-pointer p-4 md:p-5"
+    class="alert-card-premium app-card app-card-hover cursor-pointer p-4 md:p-5 transition-all duration-300"
     :class="[
       borderClass,
       highlight ? 'ring-1 ring-amber-400/50 scale-[1.01] shadow-[0_0_32px_-8px_rgba(251,191,36,0.35)]' : '',
     ]"
+    role="button"
+    tabindex="0"
     @click="$emit('open', alert)"
+    @keydown.enter="$emit('open', alert)"
   >
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="flex gap-3 min-w-0">
