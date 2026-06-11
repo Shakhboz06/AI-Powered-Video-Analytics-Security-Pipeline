@@ -55,7 +55,7 @@
       <!-- Bottom overlay stats -->
       <div
         v-if="snapshot && !loading"
-        class="absolute inset-x-0 bottom-0 grid grid-cols-2 gap-px border-t border-white/[0.06] bg-black/50 backdrop-blur-md sm:grid-cols-3"
+        class="absolute inset-x-0 bottom-0 grid grid-cols-3 gap-px border-t border-white/[0.06] bg-black/50 backdrop-blur-md"
       >
         <div class="px-4 py-3">
           <p class="app-label">Detections</p>
@@ -70,7 +70,7 @@
             <span class="text-sm font-normal text-gray-400"> ms</span>
           </p>
         </div>
-        <div class="hidden px-4 py-3 sm:block">
+        <div class="px-4 py-3">
           <p class="app-label">Classes</p>
           <p class="mt-0.5 text-xl font-semibold tabular-nums text-white sm:text-2xl">
             {{ classCount }}
@@ -114,31 +114,7 @@
       />
 
       <template v-else-if="snapshot">
-        <div class="grid gap-4 sm:grid-cols-3">
-          <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p class="app-label">Total detections</p>
-            <p class="mt-1 text-3xl font-semibold tabular-nums text-gray-100">
-              <AnimatedNumber :value="snapshot.total_detections" />
-            </p>
-          </div>
-          <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p class="app-label">Inference latency</p>
-            <p class="mt-1 text-3xl font-semibold tabular-nums" :class="latencyColorClass(snapshot.latency_ms)">
-              <AnimatedNumber :value="snapshot.latency_ms" :decimals="1" />
-              <span class="text-base text-gray-500"> ms</span>
-            </p>
-            <p class="mt-1 text-xs" :class="latencyHintClass(snapshot.latency_ms)">
-              {{ latencyHint(snapshot.latency_ms) }}
-            </p>
-          </div>
-          <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <p class="app-label">Object classes</p>
-            <p class="mt-1 text-3xl font-semibold tabular-nums text-gray-100">{{ classCount }}</p>
-            <p class="mt-1 text-xs text-gray-500">Distinct types detected</p>
-          </div>
-        </div>
-
-        <div v-if="Object.keys(snapshot.total_objects).length" class="mt-6">
+        <div v-if="Object.keys(snapshot.total_objects).length">
           <p class="app-section-title mb-3">Class breakdown</p>
           <div class="flex flex-wrap gap-2">
             <span
@@ -150,6 +126,9 @@
               <span class="font-mono font-semibold text-teal-300">{{ count }}</span>
             </span>
           </div>
+        </div>
+        <div v-else class="text-sm text-gray-500">
+          No objects detected in the current frame.
         </div>
       </template>
     </div>
@@ -204,17 +183,5 @@ onUnmounted(() => {
 
 function sortedClasses(obj: Record<string, number>) {
   return Object.fromEntries(Object.entries(obj).sort((a, b) => b[1] - a[1]))
-}
-
-function latencyHint(ms: number) {
-  if (ms < 300) return 'Within normal range'
-  if (ms <= 500) return 'Elevated — monitor'
-  return 'High latency — investigate'
-}
-
-function latencyHintClass(ms: number) {
-  if (ms < 300) return 'text-emerald-500/90'
-  if (ms <= 500) return 'text-amber-400/90'
-  return 'text-red-400/90'
 }
 </script>

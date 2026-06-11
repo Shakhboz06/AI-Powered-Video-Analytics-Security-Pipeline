@@ -39,7 +39,7 @@
           type="number"
           min="1"
           step="1"
-          class="app-input w-32"
+          class="app-input min-w-[200px]"
           @change="onThresholdCommitted"
         >
       </div>

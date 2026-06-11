@@ -24,7 +24,7 @@
         <select
           id="alert-status"
           v-model="filterStatus"
-          class="app-input min-w-[180px]"
+          class="app-input min-w-[200px]"
         >
           <option v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
@@ -34,7 +34,7 @@
         <select
           id="alert-type"
           v-model="filterType"
-          class="app-input min-w-[180px]"
+          class="app-input min-w-[200px]"
         >
           <option v-for="o in ALERT_TYPE_FILTER_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
@@ -64,7 +64,7 @@
       </template>
     </FilterToolbar>
 
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+    <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
       <div
         v-for="card in statCards"
         :key="card.key"
