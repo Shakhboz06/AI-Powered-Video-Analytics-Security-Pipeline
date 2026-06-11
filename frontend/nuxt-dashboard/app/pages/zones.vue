@@ -84,6 +84,10 @@
             <strong>Click on the canvas</strong> to place polygon points (minimum 3).
             <strong>Double-click</strong> or press the <strong>Finish</strong> button to close the shape.
           </p>
+          <p class="mt-1.5 text-xs text-teal-100">
+            This zone will be assigned to camera:
+            <span class="rounded bg-teal-500/20 px-1.5 py-0.5 font-mono font-semibold text-teal-200">{{ selectedCamera || '—' }}</span>
+          </p>
           <p v-if="draft.length" class="mt-1.5 text-xs font-mono text-teal-400">
             {{ draft.length }} point{{ draft.length === 1 ? '' : 's' }} placed{{ draft.length < 3 ? ` — need ${3 - draft.length} more` : ' — ready to finish' }}
           </p>
@@ -175,10 +179,14 @@
     <AppModal
       :open="showModal"
       :title="modalMode === 'create' ? 'New zone' : 'Edit zone'"
-      subtitle="Configure zone name, schedule, and alert thresholds."
+      :subtitle="`For camera “${selectedCamera}” · configure name, schedule, and alert thresholds.`"
       @close="closeModal"
     >
       <div class="space-y-4">
+            <div class="rounded-lg border border-teal-500/30 bg-teal-950/20 px-3 py-2 text-sm text-teal-200">
+              <span class="text-teal-400/80">Assigned camera:</span>
+              <span class="font-mono font-semibold">{{ selectedCamera || '—' }}</span>
+            </div>
             <div>
               <label class="app-label mb-1.5 block">Name <span class="text-red-400">*</span></label>
               <input

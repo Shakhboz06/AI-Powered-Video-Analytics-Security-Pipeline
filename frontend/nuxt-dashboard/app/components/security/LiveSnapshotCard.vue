@@ -30,6 +30,25 @@
       <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
       <div v-if="!loading && snapshot" class="scan-line pointer-events-none absolute left-0 right-0 h-px bg-teal-400/35" />
 
+      <!-- Restricted-zone overlay -->
+      <svg
+        v-if="zones && zones.length"
+        class="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 640 480"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <polygon
+          v-for="z in zones"
+          :key="z.id"
+          :points="polygonPoints(z.polygon)"
+          fill="rgba(45, 212, 191, 0.14)"
+          stroke="rgb(45, 212, 191)"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+
       <!-- Top bar -->
       <div class="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-3 sm:p-4">
         <div class="flex items-center gap-2">
@@ -141,6 +160,7 @@ import EmptyState from '~/components/ui/EmptyState.vue'
 import { cameraImageUrl } from '~/composables/useCameraImage'
 import { latencyBgClass, latencyColorClass } from '~/composables/useChartTheme'
 import { formatRelativeAgo } from '~/composables/useRelativeTime'
+import type { Point, SecurityZone } from '~/types/security'
 
 const props = defineProps<{
   camera: string
@@ -153,7 +173,12 @@ const props = defineProps<{
   loading: boolean
   error: string | null
   lastUpdated: string | null
+  zones?: SecurityZone[]
 }>()
+
+function polygonPoints(polygon: Point[]): string {
+  return polygon.map((p) => `${p.x},${p.y}`).join(' ')
+}
 
 const imgError = ref(false)
 const nowMs = ref(Date.now())

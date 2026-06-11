@@ -64,7 +64,7 @@
       </template>
     </FilterToolbar>
 
-    <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+    <div class="grid gap-3 grid-cols-2 sm:grid-cols-4 xl:grid-cols-8">
       <div
         v-for="card in statCards"
         :key="card.key"
@@ -292,7 +292,7 @@ const counts = computed(() => {
   )
 })
 
-const STAT_CARD_TYPES = ['fighting', 'falling', 'intrusion', 'abandoned_object']
+const STAT_CARD_TYPES = ['fighting', 'falling', 'intrusion', 'running', 'brandishing', 'abandoned_object', 'loitering']
 
 interface StatCard {
   key: string

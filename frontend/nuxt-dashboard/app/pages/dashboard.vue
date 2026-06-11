@@ -94,6 +94,7 @@
           :loading="liveLoading"
           :error="liveError"
           :last-updated="lastUpdatedFormatted"
+          :zones="liveZones"
         />
         <ClassDonutChart :total-objects="liveSnapshot?.total_objects ?? null" />
 
@@ -147,7 +148,7 @@ import CameraStatusList from '~/components/security/CameraStatusList.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
 import FilterToolbar from '~/components/ui/FilterToolbar.vue'
 import KpiCard from '~/components/ui/KpiCard.vue'
-import type { CameraStatusRow } from '~/types/security'
+import type { CameraStatusRow, SecurityZone } from '~/types/security'
 
 definePageMeta({
   layout: 'security',
@@ -188,6 +189,7 @@ const liveSnapshot = ref<{
 const liveLoading = ref(false)
 const liveError = ref<string | null>(null)
 const lastUpdatedAt = ref<Date | null>(null)
+const liveZones = ref<SecurityZone[]>([])
 
 const statusRows = ref<CameraStatusRow[]>([])
 const statusLoading = ref(false)
@@ -276,6 +278,7 @@ async function runPollTick(silent = false) {
   try {
     await loadCameras()
     await loadLive()
+    await loadZones()
     await loadStatusForCameras()
     resetCountdown()
   }
@@ -427,7 +430,22 @@ onUnmounted(() => {
   if (countdownTimer) clearInterval(countdownTimer)
 })
 
+async function loadZones() {
+  if (!selectedCamera.value) {
+    liveZones.value = []
+    return
+  }
+  try {
+    const { data } = await api.listZones(selectedCamera.value)
+    liveZones.value = (data ?? []).filter((z) => z.is_active && z.polygon?.length >= 3)
+  }
+  catch {
+    liveZones.value = []
+  }
+}
+
 watch(selectedCamera, () => {
   loadLive()
+  loadZones()
 })
 </script>
