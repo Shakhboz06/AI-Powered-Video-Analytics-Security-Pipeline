@@ -32,23 +32,21 @@
           <option value="custom">Custom</option>
         </select>
       </div>
-      <div v-if="rangePreset === 'custom'" class="flex flex-wrap gap-3">
-        <div class="flex flex-col gap-1">
-          <label class="app-label">Start</label>
-          <input
-            v-model="customStart"
-            type="datetime-local"
-            class="app-input"
-          >
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="app-label">End</label>
-          <input
-            v-model="customEnd"
-            type="datetime-local"
-            class="app-input"
-          >
-        </div>
+      <div v-if="rangePreset === 'custom'" class="flex flex-col gap-1">
+        <label class="app-label">Start</label>
+        <input
+          v-model="customStart"
+          type="datetime-local"
+          class="app-input min-w-[200px]"
+        >
+      </div>
+      <div v-if="rangePreset === 'custom'" class="flex flex-col gap-1">
+        <label class="app-label">End</label>
+        <input
+          v-model="customEnd"
+          type="datetime-local"
+          class="app-input min-w-[200px]"
+        >
       </div>
       <template #actions>
         <button

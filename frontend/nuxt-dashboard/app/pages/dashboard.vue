@@ -6,20 +6,28 @@
       subtitle="Real-time detection feed, camera health, and class distribution across your fleet."
     />
 
-    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section class="grid gap-3 sm:grid-cols-2">
       <KpiCard
-        v-for="kpi in kpiCards"
-        :key="kpi.key"
-        :label="kpi.label"
-        :value="kpi.value"
-        :suffix="kpi.suffix"
-        :hint="kpi.hint"
-        :decimals="kpi.decimals"
-        :icon-path="kpi.iconPath"
-        :icon-wrap-class="kpi.iconWrapClass"
-        :accent-class="kpi.accentClass"
-        :spark="kpi.spark"
-        :spark-color="kpi.sparkColor"
+        label="Cameras online"
+        :value="onlineCount"
+        :suffix="cameras.length ? ` / ${cameras.length}` : undefined"
+        :hint="cameras.length ? `${cameras.length - onlineCount} offline or stale` : 'No cameras configured'"
+        icon-path="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+        icon-wrap-class="border-emerald-500/20 bg-emerald-950/30"
+        accent-class="text-emerald-400"
+        spark-color="#34d399"
+      />
+      <KpiCard
+        label="Fleet avg latency"
+        :value="avgLatency ?? 0"
+        :decimals="1"
+        suffix=" ms"
+        :hint="avgLatency != null ? (avgLatency < 300 ? 'Fleet within normal range' : 'Elevated — check health') : 'Waiting for data'"
+        icon-path="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
+        icon-wrap-class="border-cyan-500/20 bg-cyan-950/30"
+        accent-class="text-cyan-400"
+        :spark="latencyHistory"
+        spark-color="#22d3ee"
       />
     </section>
 
@@ -163,7 +171,6 @@ const POLL_MS_STORAGE_KEY = 'live_dashboard_poll_ms'
 const pollIntervalMs = ref<number>(5 * 60 * 1000)
 const refreshCountdownSec = ref(0)
 const refreshing = ref(false)
-const detectionHistory = ref<number[]>([])
 const latencyHistory = ref<number[]>([])
 
 const cameras = ref<string[]>([])
@@ -244,57 +251,6 @@ const recentActivity = computed<ActivityEvent[]>(() => {
   return events.slice(0, 8)
 })
 
-const kpiCards = computed(() => [
-  {
-    key: 'online',
-    label: 'Cameras online',
-    value: onlineCount.value,
-    suffix: cameras.value.length ? ` / ${cameras.value.length}` : undefined,
-    hint: cameras.value.length ? `${cameras.value.length - onlineCount.value} offline or stale` : 'No cameras configured',
-    iconPath: 'M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z',
-    iconWrapClass: 'border-emerald-500/20 bg-emerald-950/30',
-    accentClass: 'text-emerald-400',
-    spark: [] as number[],
-    sparkColor: '#34d399',
-  },
-  {
-    key: 'detections',
-    label: 'Active detections',
-    value: liveSnapshot.value?.total_detections ?? 0,
-    hint: selectedCamera.value ? `On ${selectedCamera.value}` : 'Select a camera',
-    iconPath: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
-    iconWrapClass: 'border-teal-500/20 bg-teal-950/30',
-    accentClass: 'text-teal-400',
-    spark: detectionHistory.value,
-    sparkColor: '#2dd4bf',
-  },
-  {
-    key: 'latency',
-    label: 'Avg latency',
-    value: avgLatency.value ?? 0,
-    decimals: 1,
-    suffix: ' ms',
-    hint: avgLatency.value != null
-      ? (avgLatency.value < 300 ? 'Fleet within normal range' : 'Elevated — check health')
-      : 'Waiting for data',
-    iconPath: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z',
-    iconWrapClass: 'border-cyan-500/20 bg-cyan-950/30',
-    accentClass: 'text-cyan-400',
-    spark: latencyHistory.value,
-    sparkColor: '#22d3ee',
-  },
-  {
-    key: 'classes',
-    label: 'Object classes',
-    value: Object.keys(liveSnapshot.value?.total_objects ?? {}).length,
-    hint: 'Distinct types in latest frame',
-    iconPath: 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z',
-    iconWrapClass: 'border-indigo-500/20 bg-indigo-950/30',
-    accentClass: 'text-indigo-400',
-    spark: [] as number[],
-    sparkColor: '#818cf8',
-  },
-])
 
 let pollTimer: ReturnType<typeof setInterval> | undefined
 let countdownTimer: ReturnType<typeof setInterval> | undefined
@@ -387,7 +343,6 @@ async function loadLive() {
         recorded_at: d.recorded_at,
       }
       lastUpdatedAt.value = new Date()
-      detectionHistory.value = [...detectionHistory.value.slice(-19), d.total_detections]
       latencyHistory.value = [...latencyHistory.value.slice(-19), d.latency_ms]
     }
     else {

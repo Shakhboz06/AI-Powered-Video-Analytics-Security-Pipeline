@@ -20,16 +20,26 @@
     <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
     <section class="app-card overflow-hidden">
-      <div class="border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
+      <div class="border-b border-white/[0.06] px-4 py-3 flex items-center justify-between gap-3">
         <h2 class="app-section-title">Camera list</h2>
-        <button
-          type="button"
-          class="text-xs text-teal-300 hover:underline disabled:text-gray-600"
-          :disabled="loading"
-          @click="loadCameras"
-        >
-          {{ loading ? 'Refreshing…' : 'Refresh' }}
-        </button>
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="text-xs text-teal-300 hover:underline disabled:text-gray-600"
+            :disabled="loading"
+            @click="loadCameras"
+          >
+            {{ loading ? 'Refreshing…' : 'Refresh' }}
+          </button>
+          <button
+            type="button"
+            class="btn-primary text-sm"
+            @click="openCreate"
+          >
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            Add
+          </button>
+        </div>
       </div>
 
       <div v-if="loading && !cameras.length" class="divide-y divide-white/[0.06]">

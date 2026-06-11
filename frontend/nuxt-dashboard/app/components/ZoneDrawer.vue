@@ -16,6 +16,7 @@
         @mousemove="onMove"
         @mouseleave="onLeave"
       />
+      <!-- Coordinate tooltip while drawing -->
       <div
         v-if="isDrawing && cursorTip.visible"
         class="pointer-events-none absolute z-20 rounded border border-gray-600 bg-gray-950/95 px-2 py-1 text-[11px] font-mono text-teal-200 shadow-lg"
@@ -23,11 +24,20 @@
       >
         x: {{ cursorTip.px }}, y: {{ cursorTip.py }}
       </div>
+      <!-- Overlay prompt when drawing with no points yet -->
+      <div
+        v-if="isDrawing && draft.length === 0"
+        class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+      >
+        <div class="rounded-xl border border-teal-500/30 bg-black/70 px-6 py-4 text-center backdrop-blur-sm">
+          <svg class="mx-auto mb-2 h-8 w-8 text-teal-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
+          </svg>
+          <p class="text-sm font-medium text-teal-200">Click anywhere to start drawing</p>
+          <p class="mt-1 text-xs text-gray-400">Place at least 3 points to form a zone</p>
+        </div>
+      </div>
     </div>
-    <p class="text-xs text-gray-500">
-      Click to add points. Minimum 3 points required. Double-click or press <span class="text-gray-300">Finish</span> to close the polygon.
-      <span v-if="!isDrawing" class="block mt-1 text-gray-500">Hover a zone to highlight it; click to select. Use <span class="text-gray-300">Add zone</span> to draw a new area.</span>
-    </p>
   </div>
 </template>
 
