@@ -164,6 +164,8 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '~/components/ui/PageHeader.vue'
+import AppModal from '~/components/ui/AppModal.vue'
 import Skeleton from '~/components/ui/Skeleton.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
 import type { CameraConfig } from '~/types/security'

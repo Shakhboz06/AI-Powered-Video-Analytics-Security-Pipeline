@@ -92,7 +92,7 @@ export function useApi() {
       headers: headersData(),
     })
     return {
-      cameras: res.cameras
+      cameras: (res.cameras ?? [])
         .filter((camera) => typeof camera === 'string' || camera.is_active)
         .map((camera) => typeof camera === 'string' ? camera : camera.camera_name)
         .filter(Boolean),

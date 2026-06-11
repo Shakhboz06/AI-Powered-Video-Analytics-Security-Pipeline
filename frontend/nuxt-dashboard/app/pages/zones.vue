@@ -280,6 +280,8 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '~/components/ui/PageHeader.vue'
+import AppModal from '~/components/ui/AppModal.vue'
 import ZoneDrawer from '~/components/ZoneDrawer.vue'
 import type { Point, SecurityZone } from '~/types/security'
 
@@ -403,8 +405,8 @@ onMounted(async () => {
   camerasLoading.value = true
   try {
     const res = await api.getCameras()
-    cameras.value = res.cameras
-    if (res.cameras.length) selectedCamera.value = res.cameras[0]!
+    cameras.value = res.cameras ?? []
+    if (cameras.value.length) selectedCamera.value = cameras.value[0]!
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Could not load cameras'
@@ -482,7 +484,8 @@ async function loadZones(camera: string) {
   zonesLoading.value = true
   pageError.value = null
   try {
-    const { data } = await api.listZones(camera)
+    const res = await api.listZones(camera)
+    const data = res.data ?? []
     zonesList.value = data
     selectedZoneId.value = data[0]?.id ?? null
   }

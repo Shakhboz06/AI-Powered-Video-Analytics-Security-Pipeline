@@ -5,6 +5,11 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
+  components: {
+    dirs: [
+      { path: '~/components', pathPrefix: false },
+    ],
+  },
   ignore: [
     'app/pages/UiElements/**',
     // Do not ignore Auth/login.vue or Auth/register.vue — only legacy demo auth pages.
