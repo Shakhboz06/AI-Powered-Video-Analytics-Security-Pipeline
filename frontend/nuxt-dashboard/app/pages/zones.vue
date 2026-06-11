@@ -30,9 +30,8 @@
       </div>
       <template #actions>
         <button
-          v-if="selectedCamera"
           type="button"
-          class="btn-ghost"
+          class="btn-primary"
           :disabled="!selectedCamera || saving || isDrawing"
           @click="startAddZone"
         >
