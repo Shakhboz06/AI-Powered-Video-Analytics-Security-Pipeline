@@ -24,11 +24,9 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS:
-        INTERNAL://kafka:9092,
-        EXTERNAL://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,TAILSCALE://0.0.0.0:39092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092,TAILSCALE://shahboz-shodiev.tail70e378.ts.net:39092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,TAILSCALE:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_MESSAGE_MAX_BYTES:       5000000
       KAFKA_REPLICA_FETCH_MAX_BYTES: 5000000
@@ -36,6 +34,7 @@ services:
     ports:
       - "9092:9092"
       - "29092:29092"
+      - "39092:39092"
     depends_on:
       - zookeeper
     healthcheck:
@@ -62,17 +61,16 @@ services:
   ## ────────────────────────────────────
   ## Worker (Python)
   ## ────────────────────────────────────
-  worker:
-    build:
-      context: ./worker
-      dockerfile: worker.dockerfile
-    # container_name: worker
-    env_file:
-      - .env
-    depends_on:
-      kafka:
-        condition: service_healthy
-      
+  # worker:
+  #   build:
+  #     context: ./worker
+  #     dockerfile: worker.dockerfile
+  #   # container_name: worker
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
   ## ────────────────────────────────────
   ## Aggregator (Go)
   ## ────────────────────────────────────
@@ -135,48 +133,6 @@ services:
     ports:
       - "1025:1025"  # SMTP port
       - "8025:8025"  # Web UI
-      
-  ## ────────────────────────────────────
-  ## Conduktor Console & its DB
-  ## ────────────────────────────────────
-  # postgresql:
-  #   image: postgres:14
-  #   container_name: conduktor-postgres
-  #   hostname: postgresql
-  #   volumes:
-  #     - pg_data:/var/lib/postgresql/data
-  #   environment:
-  #     POSTGRES_DB: conduktor_console
-  #     POSTGRES_USER: conduktor
-  #     POSTGRES_PASSWORD: change_me
-  #     POSTGRES_HOST_AUTH_METHOD: scram-sha-256
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U conduktor"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-
-  # conduktor-console:
-  #   image: conduktor/conduktor-console:1.36.0
-  #   container_name: conduktor-console
-  #   ports:
-  #     - "8080:8080"  # Browse to http://localhost:8080
-  #   volumes:
-  #     - conduktor_data:/var/conduktor
-  #   environment:
-  #     CDK_ORGANIZATION_NAME:       "local-dev"
-  #     CDK_DATABASE_URL:            "postgresql://conduktor:change_me@postgresql:5432/conduktor_console"
-  #     CDK_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-  #   depends_on:
-  #     postgresql:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ["CMD-SHELL", 'curl -f http://localhost:8080/health || exit 1']
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
   postgres:
     image: timescale/timescaledb:latest-pg17
     container_name: postgres

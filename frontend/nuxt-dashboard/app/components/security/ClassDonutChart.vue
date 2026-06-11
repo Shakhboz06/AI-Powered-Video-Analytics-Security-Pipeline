@@ -1,25 +1,38 @@
 <template>
-  <div class="rounded-xl border border-gray-800 bg-[#12181f] p-5 md:p-6">
-    <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Class distribution</h3>
+  <div class="app-card app-card-hover p-5 md:p-6">
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <h3 class="app-section-title">Class distribution</h3>
+      <span v-if="hasData" class="app-chip text-gray-400">
+        {{ totalObjects }} objects
+      </span>
+    </div>
     <ClientOnly>
       <VueApexCharts
         v-if="hasData"
         type="donut"
-        height="280"
+        height="260"
         :options="chartOptions"
         :series="series"
       />
-      <div v-else class="h-[280px] flex items-center justify-center text-gray-500 text-sm">
-        No class data to chart
-      </div>
+      <EmptyState
+        v-else
+        icon="chart"
+        title="No class data yet"
+        message="Object class breakdown will appear once detections are reported for the selected camera."
+        class="py-6"
+      />
       <template #fallback>
-        <div class="h-[280px] flex items-center justify-center text-gray-500">Loading chart…</div>
+        <div class="flex h-[260px] items-center justify-center">
+          <Skeleton width="8rem" height="0.85rem" />
+        </div>
       </template>
     </ClientOnly>
   </div>
 </template>
 
 <script setup lang="ts">
+import EmptyState from '~/components/ui/EmptyState.vue'
+import Skeleton from '~/components/ui/Skeleton.vue'
 import { useChartTheme } from '~/composables/useChartTheme'
 
 const props = defineProps<{
@@ -43,6 +56,8 @@ const labels = computed(() => {
   return Object.keys(props.totalObjects)
 })
 
+const totalObjects = computed(() => series.value.reduce((a, b) => a + b, 0))
+
 const chartOptions = computed(() => ({
   ...base,
   labels: labels.value,
@@ -53,13 +68,14 @@ const chartOptions = computed(() => ({
         size: '68%',
         labels: {
           show: true,
-          name: { color: '#9ca3af' },
-          value: { color: '#e5e7eb' },
+          name: { color: '#9ca3af', fontSize: '12px' },
+          value: { color: '#e5e7eb', fontSize: '18px', fontWeight: 600 },
           total: {
             show: true,
             label: 'Objects',
             color: '#6b7280',
-            formatter: () => String(series.value.reduce((a, b) => a + b, 0)),
+            fontSize: '11px',
+            formatter: () => String(totalObjects.value),
           },
         },
       },

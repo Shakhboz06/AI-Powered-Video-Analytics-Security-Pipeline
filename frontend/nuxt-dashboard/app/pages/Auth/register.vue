@@ -1,58 +1,61 @@
 <template>
-  <div class="w-full max-w-md rounded-xl border border-gray-800 bg-[#12181f] p-8 shadow-xl">
-    <div class="mb-8 text-center">
-      <h1 class="text-xl font-semibold text-gray-100">Create account</h1>
-      <p class="mt-2 text-sm text-gray-500">Register for the security dashboard</p>
+  <div class="p-8">
+    <div class="mb-7 text-center">
+      <h2 class="text-xl font-semibold text-gray-100">Create account</h2>
+      <p class="mt-1.5 text-sm text-gray-500">Start monitoring with AI-powered video analytics</p>
     </div>
     <form class="space-y-5" @submit.prevent="onSubmit">
       <div>
-        <label for="username" class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">Username</label>
+        <label for="username" class="app-label mb-1.5 block">Username</label>
         <input
           id="username"
           v-model="username"
           type="text"
           required
           autocomplete="username"
-          class="w-full rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-600"
+          class="app-input w-full placeholder:text-gray-600"
+          placeholder="operator"
         >
       </div>
       <div>
-        <label for="email" class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">Email</label>
+        <label for="email" class="app-label mb-1.5 block">Email</label>
         <input
           id="email"
           v-model="email"
           type="email"
           required
           autocomplete="email"
-          class="w-full rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-600"
+          class="app-input w-full placeholder:text-gray-600"
           placeholder="you@example.com"
         >
       </div>
       <div>
-        <label for="password" class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">Password</label>
+        <label for="password" class="app-label mb-1.5 block">Password</label>
         <input
           id="password"
           v-model="password"
           type="password"
           required
           autocomplete="new-password"
-          class="w-full rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-600"
+          class="app-input w-full placeholder:text-gray-600"
         >
       </div>
-      <div v-if="error" class="rounded-lg bg-red-950/40 border border-red-900/50 px-3 py-2 text-sm text-red-300">
-        {{ error }}
-      </div>
+      <div v-if="error" class="app-banner-error">{{ error }}</div>
       <button
         type="submit"
-        class="w-full rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium py-2.5 transition-colors disabled:opacity-50"
+        class="btn-primary w-full disabled:opacity-50"
         :disabled="pending"
       >
-        {{ pending ? 'Creating account…' : 'Register' }}
+        <svg v-if="pending" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        {{ pending ? 'Creating account…' : 'Create account' }}
       </button>
     </form>
     <p class="mt-6 text-center text-sm text-gray-500">
       Already have an account?
-      <NuxtLink to="/auth/login" class="text-teal-400 hover:text-teal-300 font-medium">Sign in</NuxtLink>
+      <NuxtLink to="/auth/login" class="font-medium text-teal-400 hover:text-teal-300">Sign in</NuxtLink>
     </p>
   </div>
 </template>
@@ -77,7 +80,7 @@ async function onSubmit() {
   pending.value = true
   try {
     await auth.register(username.value.trim(), email.value.trim(), password.value)
-    await router.push('/')
+    await router.push('/dashboard')
   }
   catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Registration failed'

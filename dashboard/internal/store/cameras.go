@@ -109,6 +109,9 @@ func (s *CameraStore) Update (ctx context.Context, camera Cameras, id int64)(*Ca
 
 func (s *CameraStore) Delete(ctx context.Context, id int64) error {
 
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	
 	query := `
 		DELETE FROM cameras WHERE camera_id = $1;
 	`

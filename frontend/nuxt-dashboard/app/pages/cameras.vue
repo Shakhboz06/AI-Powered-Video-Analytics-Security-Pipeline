@@ -1,26 +1,27 @@
 <template>
   <div class="space-y-6">
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 class="text-xl font-semibold text-gray-100">Cameras</h1>
-        <p class="mt-1 text-sm text-gray-500">Manage configured camera sources used by monitoring, zones, alerts, and analytics.</p>
-      </div>
-      <button
-        type="button"
-        class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
-        @click="openCreate"
-      >
-        Add camera
-      </button>
-    </header>
+    <PageHeader
+      eyebrow="Configuration"
+      title="Cameras"
+      subtitle="Manage configured camera sources used by monitoring, zones, alerts, and analytics."
+    >
+      <template #actions>
+        <button
+          type="button"
+          class="btn-primary"
+          @click="openCreate"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          Add camera
+        </button>
+      </template>
+    </PageHeader>
 
-    <div v-if="pageError" class="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-      {{ pageError }}
-    </div>
+    <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
-    <section class="rounded-xl border border-gray-800 bg-[#12181f] overflow-hidden">
-      <div class="border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Camera list</h2>
+    <section class="app-card overflow-hidden">
+      <div class="border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
+        <h2 class="app-section-title">Camera list</h2>
         <button
           type="button"
           class="text-xs text-teal-300 hover:underline disabled:text-gray-600"
@@ -31,59 +32,68 @@
         </button>
       </div>
 
-      <div v-if="loading && !cameras.length" class="p-8 text-sm text-gray-500">Loading cameras…</div>
-      <div v-else-if="!cameras.length" class="p-8 text-center text-sm text-gray-500">
-        No cameras configured yet.
+      <div v-if="loading && !cameras.length" class="divide-y divide-white/[0.06]">
+        <div v-for="i in 4" :key="i" class="flex items-center gap-4 px-4 py-4">
+          <div class="flex-1 space-y-2">
+            <Skeleton width="8rem" height="0.9rem" />
+            <Skeleton width="4rem" height="0.7rem" />
+          </div>
+          <Skeleton width="14rem" height="0.8rem" />
+          <Skeleton width="4rem" height="1.5rem" rounded="rounded-md" />
+          <Skeleton width="6rem" height="0.8rem" />
+        </div>
       </div>
-      <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-800">
-          <thead class="bg-gray-900/40">
-            <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
-              <th class="px-4 py-3 font-medium">Name</th>
-              <th class="px-4 py-3 font-medium">Video source</th>
-              <th class="px-4 py-3 font-medium">Status</th>
-              <th class="px-4 py-3 font-medium">Updated</th>
-              <th class="px-4 py-3 font-medium text-right">Actions</th>
+      <EmptyState
+        v-else-if="!cameras.length"
+        icon="camera"
+        title="No cameras configured yet"
+        message="Add your first camera source to start monitoring detections, zones, and alerts."
+      >
+        <template #action>
+          <button type="button" class="btn-primary" @click="openCreate">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            Add camera
+          </button>
+        </template>
+      </EmptyState>
+      <div v-else class="app-table-wrap">
+        <table class="app-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Video source</th>
+              <th>Status</th>
+              <th>Updated</th>
+              <th class="text-right">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-800">
-            <tr v-for="camera in cameras" :key="camera.camera_id" class="text-sm">
-              <td class="px-4 py-3">
+          <tbody>
+            <tr v-for="camera in cameras" :key="camera.camera_id">
+              <td>
                 <p class="font-medium text-gray-100">{{ camera.camera_name }}</p>
                 <p class="mt-0.5 text-xs text-gray-500 font-mono">ID {{ camera.camera_id }}</p>
               </td>
-              <td class="px-4 py-3 max-w-md">
+              <td class="max-w-md">
                 <p class="truncate font-mono text-xs text-gray-300" :title="camera.video_source">
                   {{ camera.video_source }}
                 </p>
               </td>
-              <td class="px-4 py-3">
+              <td>
                 <span
-                  class="inline-flex rounded-md border px-2 py-0.5 text-xs font-medium"
-                  :class="camera.is_active ? 'border-emerald-800/50 bg-emerald-950/30 text-emerald-200' : 'border-gray-700 bg-gray-900/60 text-gray-400'"
+                  class="stat-pill"
+                  :class="camera.is_active ? 'border-emerald-800/50 bg-emerald-950/30 text-emerald-200' : 'text-gray-400'"
                 >
+                  <span class="h-1.5 w-1.5 rounded-full" :class="camera.is_active ? 'bg-emerald-400' : 'bg-gray-600'" />
                   {{ camera.is_active ? 'Active' : 'Inactive' }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-xs text-gray-500">
+              <td class="text-xs text-gray-500">
                 {{ formatDate(camera.updated_at || camera.created_at) }}
               </td>
-              <td class="px-4 py-3">
+              <td>
                 <div class="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    class="rounded border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800"
-                    @click="openEdit(camera)"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded border border-red-900/50 px-3 py-1.5 text-xs text-red-300 hover:bg-red-950/30"
-                    @click="onDelete(camera)"
-                  >
-                    Delete
-                  </button>
+                  <button type="button" class="btn-ghost-sm" @click="openEdit(camera)">Edit</button>
+                  <button type="button" class="btn-danger-sm" @click="onDelete(camera)">Delete</button>
                 </div>
               </td>
             </tr>
@@ -92,67 +102,44 @@
       </div>
     </section>
 
-    <Teleport to="body">
-      <div
-        v-if="showModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-        @click.self="closeModal"
-      >
-        <div class="w-full max-w-md rounded-xl border border-gray-700 bg-[#12181f] p-5 shadow-xl">
-          <h3 class="text-lg font-semibold text-gray-100">
-            {{ modalMode === 'create' ? 'Add camera' : 'Edit camera' }}
-          </h3>
-
-          <div class="mt-4 space-y-4">
-            <div>
-              <label class="text-xs text-gray-500 uppercase">Camera name <span class="text-red-400">*</span></label>
-              <input
-                v-model="form.camera_name"
-                type="text"
-                class="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
-                placeholder="cam1"
-              >
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 uppercase">Video source <span class="text-red-400">*</span></label>
-              <input
-                v-model="form.video_source"
-                type="text"
-                class="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
-                placeholder="rtsp://camera.local/stream or /dev/video0"
-              >
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-300">
-              <input v-model="form.is_active" type="checkbox" class="rounded border-gray-600">
-              Active
-            </label>
-          </div>
-
-          <div class="mt-6 flex justify-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300"
-              :disabled="saving"
-              @click="closeModal"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500 disabled:opacity-50"
-              :disabled="saving || !form.camera_name.trim() || !form.video_source.trim()"
-              @click="submit"
-            >
-              {{ saving ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
+    <AppModal
+      :open="showModal"
+      :title="modalMode === 'create' ? 'Add camera' : 'Edit camera'"
+      subtitle="Configure a video source for detection and alerting."
+      @close="closeModal"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="app-label mb-1.5 block">Camera name <span class="text-red-400">*</span></label>
+          <input v-model="form.camera_name" type="text" class="app-input w-full" placeholder="cam1">
         </div>
+        <div>
+          <label class="app-label mb-1.5 block">Video source <span class="text-red-400">*</span></label>
+          <input v-model="form.video_source" type="text" class="app-input w-full" placeholder="rtsp://camera.local/stream">
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm text-gray-300">
+          <input v-model="form.is_active" type="checkbox" class="app-checkbox">
+          Active
+        </label>
       </div>
-    </Teleport>
+      <template #footer>
+        <button type="button" class="btn-ghost" :disabled="saving" @click="closeModal">Cancel</button>
+        <button
+          type="button"
+          class="btn-primary disabled:opacity-50"
+          :disabled="saving || !form.camera_name.trim() || !form.video_source.trim()"
+          @click="submit"
+        >
+          {{ saving ? 'Saving…' : 'Save' }}
+        </button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
 <script setup lang="ts">
+import Skeleton from '~/components/ui/Skeleton.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
 import type { CameraConfig } from '~/types/security'
 
 definePageMeta({
@@ -161,6 +148,8 @@ definePageMeta({
 })
 
 const api = useApi()
+const toast = useToast()
+const confirm = useConfirm()
 
 const cameras = ref<CameraConfig[]>([])
 const loading = ref(false)
@@ -248,9 +237,11 @@ async function submit() {
     }
     showModal.value = false
     await loadCameras()
+    toast.success(modalMode.value === 'create' ? 'Camera added' : 'Camera updated', { description: body.camera_name })
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Failed to save camera'
+    toast.error('Failed to save camera')
   }
   finally {
     saving.value = false
@@ -258,14 +249,22 @@ async function submit() {
 }
 
 async function onDelete(camera: CameraConfig) {
-  if (!confirm(`Delete camera "${camera.camera_name}"?`)) return
+  const ok = await confirm.ask({
+    title: 'Delete camera?',
+    message: `"${camera.camera_name}" will be permanently removed along with its association to zones and alerts.`,
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   pageError.value = null
   try {
     await api.deleteCamera(camera.camera_id)
     await loadCameras()
+    toast.success('Camera deleted', { description: camera.camera_name })
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Failed to delete camera'
+    toast.error('Failed to delete camera')
   }
 }
 </script>

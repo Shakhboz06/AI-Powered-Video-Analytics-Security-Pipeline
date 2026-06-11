@@ -1,72 +1,167 @@
 <template>
   <div
-    class="rounded-xl border p-5 md:p-6"
+    class="app-card overflow-hidden"
     :class="borderClasses"
   >
-    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-      <div>
-        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Live snapshot</h2>
-        <p v-if="camera" class="mt-1 text-xs text-gray-500">Camera: {{ camera }}</p>
+    <!-- Camera feed hero -->
+    <div class="monitor-feed feed-hud relative aspect-video w-full overflow-hidden bg-[#05080c]">
+      <span class="hud-corner hud-tl" aria-hidden="true" />
+      <span class="hud-corner hud-tr" aria-hidden="true" />
+      <span class="hud-corner hud-bl" aria-hidden="true" />
+      <span class="hud-corner hud-br" aria-hidden="true" />
+      <img
+        v-if="feedUrl && !imgError"
+        :src="feedUrl"
+        :alt="`Live feed from ${camera || 'camera'}`"
+        class="absolute inset-0 h-full w-full object-cover"
+        @error="imgError = true"
+      >
+      <div
+        v-else
+        class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-gray-950 via-[#0a1018] to-gray-950"
+      >
+        <svg class="h-10 w-10 text-gray-600" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+        </svg>
+        <p class="text-xs text-gray-500">No preview available</p>
       </div>
-      <div v-if="lastUpdated" class="text-xs text-gray-500">
-        Last updated: <span class="text-gray-300 font-mono">{{ lastUpdated }}</span>
+
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      <div v-if="!loading && snapshot" class="scan-line pointer-events-none absolute left-0 right-0 h-px bg-teal-400/35" />
+
+      <!-- Top bar -->
+      <div class="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-3 sm:p-4">
+        <div class="flex items-center gap-2">
+          <span
+            class="app-chip border-red-500/30 bg-red-950/50 text-red-200 backdrop-blur-sm"
+            :class="loading ? 'opacity-60' : ''"
+          >
+            <span class="live-dot h-1.5 w-1.5 rounded-full bg-red-400" />
+            {{ loading ? 'Syncing' : 'Live' }}
+          </span>
+          <span v-if="camera" class="hidden app-chip backdrop-blur-sm sm:inline-flex">
+            {{ camera }}
+          </span>
+        </div>
+        <div v-if="relativeUpdated" class="app-chip backdrop-blur-sm text-gray-300">
+          <svg class="h-3 w-3 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {{ relativeUpdated }}
+        </div>
+      </div>
+
+      <!-- Bottom overlay stats -->
+      <div
+        v-if="snapshot && !loading"
+        class="absolute inset-x-0 bottom-0 grid grid-cols-2 gap-px border-t border-white/[0.06] bg-black/50 backdrop-blur-md sm:grid-cols-3"
+      >
+        <div class="px-4 py-3">
+          <p class="app-label">Detections</p>
+          <p class="mt-0.5 text-xl font-semibold tabular-nums text-white sm:text-2xl">
+            <AnimatedNumber :value="snapshot.total_detections" />
+          </p>
+        </div>
+        <div class="px-4 py-3">
+          <p class="app-label">Latency</p>
+          <p class="mt-0.5 text-xl font-semibold tabular-nums sm:text-2xl" :class="latencyColorClass(snapshot.latency_ms)">
+            <AnimatedNumber :value="snapshot.latency_ms" :decimals="1" />
+            <span class="text-sm font-normal text-gray-400"> ms</span>
+          </p>
+        </div>
+        <div class="hidden px-4 py-3 sm:block">
+          <p class="app-label">Classes</p>
+          <p class="mt-0.5 text-xl font-semibold tabular-nums text-white sm:text-2xl">
+            {{ classCount }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div
+        v-if="loading"
+        class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      >
+        <div class="flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-4 py-2 text-sm text-gray-300">
+          <svg class="h-4 w-4 animate-spin text-teal-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Refreshing feed…
+        </div>
       </div>
     </div>
 
-    <div v-if="loading" class="mt-8 flex items-center justify-center py-12 text-gray-500">
-      <span class="inline-flex items-center gap-2">
-        <span class="h-2 w-2 rounded-full bg-teal-400 animate-pulse" />
-        Loading live data…
-      </span>
-    </div>
-
-    <div v-else-if="error" class="mt-6 rounded-lg bg-red-950/30 border border-red-900/50 px-4 py-3 text-sm text-red-300">
-      {{ error }}
-    </div>
-
-    <div v-else-if="!snapshot" class="mt-8 py-12 text-center text-gray-500">
-      No recent detections for this camera.
-    </div>
-
-    <div v-else class="mt-6 grid gap-6 sm:grid-cols-2">
-      <div>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Total detections</p>
-        <p class="text-4xl md:text-5xl font-semibold tabular-nums text-gray-100">
-          {{ snapshot.total_detections }}
-        </p>
+    <!-- Body -->
+    <div class="p-5 md:p-6">
+      <div v-if="error" class="rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+        {{ error }}
       </div>
-      <div>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Inference latency</p>
-        <p
-          class="text-3xl md:text-4xl font-semibold tabular-nums"
-          :class="latencyColorClass(snapshot.latency_ms)"
-        >
-          {{ snapshot.latency_ms.toFixed(1) }}<span class="text-lg text-gray-500 ml-1">ms</span>
-        </p>
-        <p class="mt-2 text-xs" :class="latencyHintClass(snapshot.latency_ms)">
-          {{ latencyHint(snapshot.latency_ms) }}
-        </p>
-      </div>
-    </div>
 
-    <div v-if="snapshot && Object.keys(snapshot.total_objects).length" class="mt-8">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Class breakdown</p>
-      <div class="flex flex-wrap gap-2">
-        <span
-          v-for="(count, cls) in sortedClasses(snapshot.total_objects)"
-          :key="cls"
-          class="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-sm text-gray-200"
-        >
-          <span class="text-gray-400">{{ cls }}</span>
-          <span class="font-mono text-teal-300">{{ count }}</span>
-        </span>
-      </div>
+      <EmptyState
+        v-else-if="!loading && !snapshot && camera"
+        icon="camera"
+        title="No recent detections"
+        message="This camera has not reported detections in the latest poll window."
+      />
+
+      <EmptyState
+        v-else-if="!loading && !camera"
+        icon="camera"
+        title="Select a camera"
+        message="Choose a camera from the toolbar or status list to begin monitoring."
+      />
+
+      <template v-else-if="snapshot">
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p class="app-label">Total detections</p>
+            <p class="mt-1 text-3xl font-semibold tabular-nums text-gray-100">
+              <AnimatedNumber :value="snapshot.total_detections" />
+            </p>
+          </div>
+          <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p class="app-label">Inference latency</p>
+            <p class="mt-1 text-3xl font-semibold tabular-nums" :class="latencyColorClass(snapshot.latency_ms)">
+              <AnimatedNumber :value="snapshot.latency_ms" :decimals="1" />
+              <span class="text-base text-gray-500"> ms</span>
+            </p>
+            <p class="mt-1 text-xs" :class="latencyHintClass(snapshot.latency_ms)">
+              {{ latencyHint(snapshot.latency_ms) }}
+            </p>
+          </div>
+          <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <p class="app-label">Object classes</p>
+            <p class="mt-1 text-3xl font-semibold tabular-nums text-gray-100">{{ classCount }}</p>
+            <p class="mt-1 text-xs text-gray-500">Distinct types detected</p>
+          </div>
+        </div>
+
+        <div v-if="Object.keys(snapshot.total_objects).length" class="mt-6">
+          <p class="app-section-title mb-3">Class breakdown</p>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="(count, cls) in sortedClasses(snapshot.total_objects)"
+              :key="cls"
+              class="app-chip"
+            >
+              <span class="text-gray-400">{{ cls }}</span>
+              <span class="font-mono font-semibold text-teal-300">{{ count }}</span>
+            </span>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import AnimatedNumber from '~/components/ui/AnimatedNumber.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
+import { cameraImageUrl } from '~/composables/useCameraImage'
 import { latencyBgClass, latencyColorClass } from '~/composables/useChartTheme'
+import { formatRelativeAgo } from '~/composables/useRelativeTime'
 
 const props = defineProps<{
   camera: string
@@ -81,15 +176,34 @@ const props = defineProps<{
   lastUpdated: string | null
 }>()
 
+const imgError = ref(false)
+const nowMs = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | undefined
+
+const feedUrl = computed(() => cameraImageUrl(props.camera))
+const classCount = computed(() => Object.keys(props.snapshot?.total_objects ?? {}).length)
+
+const relativeUpdated = computed(() => {
+  if (!props.snapshot?.recorded_at) return null
+  return formatRelativeAgo(props.snapshot.recorded_at, nowMs.value)
+})
+
 const borderClasses = computed(() => {
-  if (!props.snapshot) return 'border-gray-800 bg-[#12181f]'
-  return ['border', latencyBgClass(props.snapshot.latency_ms)].join(' ')
+  if (!props.snapshot) return ''
+  return latencyBgClass(props.snapshot.latency_ms)
+})
+
+watch(() => props.camera, () => { imgError.value = false })
+
+onMounted(() => {
+  tickTimer = setInterval(() => { nowMs.value = Date.now() }, 15_000)
+})
+onUnmounted(() => {
+  if (tickTimer) clearInterval(tickTimer)
 })
 
 function sortedClasses(obj: Record<string, number>) {
-  return Object.fromEntries(
-    Object.entries(obj).sort((a, b) => b[1] - a[1]),
-  )
+  return Object.fromEntries(Object.entries(obj).sort((a, b) => b[1] - a[1]))
 }
 
 function latencyHint(ms: number) {

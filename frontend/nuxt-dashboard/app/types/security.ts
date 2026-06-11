@@ -82,6 +82,7 @@ export interface CameraStatusRow {
   totalDetections: number | null
   latencyMs: number | null
   recordedAt: string | null
+  recordedAtIso?: string | null
 }
 
 export interface Point {

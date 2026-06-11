@@ -34,6 +34,9 @@ func (d *RunningDetector) DetectRunning(camera string, detections []Detections, 
 	var posEntry PositionEntry
 	var alert [] Alert
 	for _, item := range detections {
+		if item.Label != "person"{
+			continue
+		}
 
 		x_min := item.BoundBox[0]
 		x_max := item.BoundBox[2]

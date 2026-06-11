@@ -1,42 +1,53 @@
 <template>
   <div class="space-y-6">
-    <header>
-      <h1 class="text-xl font-semibold text-gray-100">Alerts</h1>
-      <p class="mt-1 text-sm text-gray-500">Security incidents and zone breaches streamed live from the backend.</p>
-    </header>
+    <PageHeader
+      eyebrow="Incident Feed"
+      title="Alerts"
+      subtitle="Security incidents and zone breaches streamed live from the backend."
+    />
 
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div class="flex flex-wrap items-end gap-3">
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-500 uppercase tracking-wide">Camera</label>
-          <select
-            v-model="filterCamera"
-            class="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
-            :disabled="camerasLoading && !cameras.length"
-          >
-            <option value="">All cameras</option>
-            <option v-for="c in cameras" :key="c" :value="c">{{ c }}</option>
-          </select>
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-500 uppercase tracking-wide">Status</label>
-          <select
-            v-model="filterStatus"
-            class="min-w-[180px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
-          >
-            <option v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-          </select>
-        </div>
+    <FilterToolbar>
+      <div class="flex flex-col gap-1">
+        <label class="app-label" for="alert-camera">Camera</label>
+        <select
+          id="alert-camera"
+          v-model="filterCamera"
+          class="app-input min-w-[200px]"
+          :disabled="camerasLoading && !cameras.length"
+        >
+          <option value="">All cameras</option>
+          <option v-for="c in cameras" :key="c" :value="c">{{ c }}</option>
+        </select>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-col gap-1">
+        <label class="app-label" for="alert-status">Status</label>
+        <select
+          id="alert-status"
+          v-model="filterStatus"
+          class="app-input min-w-[180px]"
+        >
+          <option v-for="o in STATUS_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="app-label" for="alert-type">Type</label>
+        <select
+          id="alert-type"
+          v-model="filterType"
+          class="app-input min-w-[180px]"
+        >
+          <option v-for="o in ALERT_TYPE_FILTER_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+        </select>
+      </div>
+      <template #actions>
         <span
-          class="inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs"
+          class="app-chip"
           :class="streamStatusClass"
         >
           <span class="h-1.5 w-1.5 rounded-full" :class="streamDotClass" />
           {{ streamStatusLabel }}
         </span>
-        <label class="inline-flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-400">
           <input
             v-model="soundOn"
             type="checkbox"
@@ -46,10 +57,39 @@
           Sound for new
         </label>
         <div class="flex flex-wrap gap-2 text-xs">
-          <span class="rounded border border-red-800/50 bg-red-950/20 px-2.5 py-1 text-red-200">{{ counts.new }} new</span>
-          <span class="rounded border border-amber-800/50 bg-amber-950/15 px-2.5 py-1 text-amber-200/90">{{ counts.acknowledged }} ack</span>
-          <span class="rounded border border-gray-700 bg-gray-900/50 px-2.5 py-1 text-gray-400">{{ counts.resolved }} resolved</span>
+          <span class="app-chip border-red-800/50 bg-red-950/20 text-red-200">{{ counts.new }} new</span>
+          <span class="app-chip border-amber-800/50 bg-amber-950/15 text-amber-200/90">{{ counts.acknowledged }} ack</span>
+          <span class="app-chip text-gray-400">{{ counts.resolved }} resolved</span>
         </div>
+      </template>
+    </FilterToolbar>
+
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <div
+        v-for="card in statCards"
+        :key="card.key"
+        class="kpi-card"
+        :class="card.cardClass"
+      >
+        <div class="flex items-center gap-2">
+          <svg
+            class="h-4 w-4 shrink-0"
+            :class="card.accentText"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path v-for="(d, i) in card.iconPaths" :key="i" :d="d" />
+          </svg>
+          <span class="text-xs uppercase tracking-wide text-gray-400">{{ card.label }}</span>
+        </div>
+        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
+          <AnimatedNumber :value="card.count" />
+        </p>
       </div>
     </div>
 
@@ -61,16 +101,29 @@
       New alert received
     </div>
 
-    <div v-if="pageError" class="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-      {{ pageError }}
-    </div>
+    <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
-    <div v-if="loading && !alerts.length" class="text-sm text-gray-500">Loading alerts and connecting to stream…</div>
-    <div
-      v-else-if="!filteredAlerts.length"
-      class="rounded-xl border border-dashed border-gray-800 p-8 text-center text-sm text-gray-500"
-    >
-      No alerts for this view.
+    <ul v-if="loading && !alerts.length" class="space-y-3">
+      <li v-for="i in 4" :key="i" class="app-card p-4">
+        <div class="flex items-start gap-3">
+          <Skeleton width="0.5rem" height="3.5rem" rounded="rounded-full" />
+          <div class="flex-1 space-y-2.5">
+            <div class="flex gap-2">
+              <Skeleton width="5rem" height="1.25rem" />
+              <Skeleton width="6rem" height="1.25rem" />
+            </div>
+            <Skeleton width="60%" height="0.85rem" />
+            <Skeleton width="45%" height="0.85rem" />
+          </div>
+        </div>
+      </li>
+    </ul>
+    <div v-else-if="!filteredAlerts.length" class="app-card">
+      <EmptyState
+        icon="shield"
+        title="No alerts for this view"
+        message="You're all clear. New incidents will stream in here live as they are detected."
+      />
     </div>
     <ul v-else class="space-y-3">
       <li v-for="a in filteredAlerts" :key="a.id">
@@ -81,14 +134,32 @@
           :now-tick="nowTick"
           @acknowledge="onAck"
           @resolve="onResolve"
+          @open="openDrawer"
         />
       </li>
     </ul>
+
+    <AlertDetailDrawer
+      :alert="selectedAlert"
+      :busy-id="busyId"
+      @close="selectedAlertId = null"
+      @acknowledge="onAck"
+      @resolve="onResolve"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import AlertCard from '~/components/AlertCard.vue'
+import AlertDetailDrawer from '~/components/security/AlertDetailDrawer.vue'
+import AnimatedNumber from '~/components/ui/AnimatedNumber.vue'
+import EmptyState from '~/components/ui/EmptyState.vue'
+import Skeleton from '~/components/ui/Skeleton.vue'
+import {
+  ALERT_TYPE_FILTER_OPTIONS,
+  getAlertMeta,
+  normalizeAlertType,
+} from '~/composables/useAlertMeta'
 import type { SecurityAlert } from '~/types/security'
 
 definePageMeta({
@@ -105,17 +176,29 @@ const STATUS_OPTIONS = [
 
 const SOUND_KEY = 'alerts_sound_on'
 
+/** Collapse rule-based + ML alerts of the same kind for one event within this window. */
+const DEDUPE_WINDOW_MS = 5_000
+
 const api = useApi()
+const toast = useToast()
 
 const cameras = ref<string[]>([])
 const camerasLoading = ref(true)
 const filterCamera = ref('')
 const filterStatus = ref<string>('all')
+const filterType = ref<string>('all')
 
 const alerts = ref<SecurityAlert[]>([])
 const loading = ref(true)
 const pageError = ref<string | null>(null)
 const busyId = ref<number | null>(null)
+
+const selectedAlertId = ref<number | null>(null)
+const selectedAlert = computed(() => alerts.value.find((a) => a.id === selectedAlertId.value) ?? null)
+
+function openDrawer(a: SecurityAlert) {
+  selectedAlertId.value = a.id
+}
 
 const soundOn = ref(true)
 /** Ids to highlight briefly; using object + reassign for reliable reactivity */
@@ -153,8 +236,52 @@ function onSoundChange() {
   }
 }
 
+const cameraFilteredAlerts = computed(() => {
+  if (!filterCamera.value) return alerts.value
+  return alerts.value.filter((a) => a.camera === filterCamera.value)
+})
+
+/**
+ * Rule-based and ML detectors can both emit a "falling" alert for the same fall.
+ * Collapse near-simultaneous falling alerts that share a camera + tracker so the
+ * same event is shown once (keeps the highest-severity / most recent instance).
+ */
+function dedupeFalling(list: SecurityAlert[]): SecurityAlert[] {
+  const severityRank = (s?: string | null) => {
+    const v = (s ?? '').toLowerCase()
+    if (v === 'critical') return 3
+    if (v === 'high') return 2
+    if (v === 'medium') return 1
+    return 0
+  }
+  const kept: SecurityAlert[] = []
+  // newest-first list; track the last kept falling event per camera+tracker
+  const lastByKey = new Map<string, { idx: number; time: number }>()
+  for (const a of list) {
+    if (normalizeAlertType(a.alert_type) !== 'falling') {
+      kept.push(a)
+      continue
+    }
+    const key = `${a.camera}|${a.tracker_id}`
+    const time = new Date(a.recorded_at).getTime()
+    const prev = lastByKey.get(key)
+    if (prev && Math.abs(prev.time - time) <= DEDUPE_WINDOW_MS) {
+      const existing = kept[prev.idx]!
+      if (severityRank(a.severity) > severityRank(existing.severity)) {
+        kept[prev.idx] = a
+      }
+      continue
+    }
+    kept.push(a)
+    lastByKey.set(key, { idx: kept.length - 1, time })
+  }
+  return kept
+}
+
+const baseAlerts = computed(() => dedupeFalling(cameraFilteredAlerts.value))
+
 const counts = computed(() => {
-  return cameraFilteredAlerts.value.reduce(
+  return baseAlerts.value.reduce(
     (acc, a) => {
       if (a.status === 'new') acc.new++
       else if (a.status === 'acknowledged') acc.acknowledged++
@@ -165,14 +292,53 @@ const counts = computed(() => {
   )
 })
 
-const cameraFilteredAlerts = computed(() => {
-  if (!filterCamera.value) return alerts.value
-  return alerts.value.filter((a) => a.camera === filterCamera.value)
+const STAT_CARD_TYPES = ['fighting', 'falling', 'intrusion', 'abandoned_object']
+
+interface StatCard {
+  key: string
+  label: string
+  count: number
+  iconPaths: string[]
+  accentText: string
+  cardClass: string
+}
+
+const statCards = computed<StatCard[]>(() => {
+  const typeCount = new Map<string, number>()
+  for (const a of baseAlerts.value) {
+    const key = normalizeAlertType(a.alert_type)
+    if (key) typeCount.set(key, (typeCount.get(key) ?? 0) + 1)
+  }
+  const cards: StatCard[] = STAT_CARD_TYPES.map((key) => {
+    const meta = getAlertMeta(key)
+    return {
+      key,
+      label: meta.label,
+      count: typeCount.get(key) ?? 0,
+      iconPaths: meta.iconPaths,
+      accentText: meta.accentText,
+      cardClass: key === 'fighting'
+        ? 'border-orange-500/40 bg-orange-500/[0.08]'
+        : '',
+    }
+  })
+  cards.push({
+    key: 'total',
+    label: 'Total alerts',
+    count: baseAlerts.value.length,
+    iconPaths: getAlertMeta(null).iconPaths,
+    accentText: 'text-gray-300',
+    cardClass: '',
+  })
+  return cards
 })
 
 const filteredAlerts = computed(() => {
-  if (filterStatus.value === 'all') return cameraFilteredAlerts.value
-  return cameraFilteredAlerts.value.filter((a) => a.status === filterStatus.value)
+  return baseAlerts.value.filter((a) => {
+    if (filterStatus.value !== 'all' && a.status !== filterStatus.value) return false
+    if (filterType.value !== 'all' && normalizeAlertType(a.alert_type) !== filterType.value) return false
+    return true
+  })
 })
 
 const streamStatusLabel = computed(() => {
@@ -315,6 +481,10 @@ function upsertAlert(alert: SecurityAlert) {
   if (alert.status === 'new') {
     playBeep()
     markFlashing([alert.id])
+    const meta = getAlertMeta(alert.alert_type)
+    toast.warning(`${meta.label} detected`, {
+      description: `${alert.camera}${alert.zone_name ? ` · ${alert.zone_name}` : ''}`,
+    })
   }
 }
 
@@ -389,9 +559,11 @@ async function onAck(id: number) {
     const { alert } = await api.patchAlertStatus(id, 'acknowledged')
     const j = alerts.value.findIndex((a) => a.id === id)
     if (j >= 0) alerts.value[j] = alert
+    toast.success('Alert acknowledged')
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Update failed'
+    toast.error('Could not acknowledge alert')
     const j = alerts.value.findIndex((a) => a.id === id)
     if (j >= 0) alerts.value[j] = before
   }
@@ -415,9 +587,11 @@ async function onResolve(id: number) {
     const { alert } = await api.patchAlertStatus(id, 'resolved')
     const j = alerts.value.findIndex((a) => a.id === id)
     if (j >= 0) alerts.value[j] = alert
+    toast.success('Alert resolved')
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Update failed'
+    toast.error('Could not resolve alert')
     const j = alerts.value.findIndex((a) => a.id === id)
     if (j >= 0) alerts.value[j] = before
   }

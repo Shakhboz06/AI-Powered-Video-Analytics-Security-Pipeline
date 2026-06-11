@@ -116,7 +116,7 @@ func (d *BrandishingDetector) DetectBrandishing(camera string, detections []Dete
 			state.IsBrandishing = false
 		}
 
-		log.Printf("[BRAND DEBUG] tracker=%d num_weapons=%d near=%v conf_count=%d",
+		log.Printf("tracker=%d num_weapons=%d near=%v conf_count=%d",
 			det.TrackerID, len(weapons), near_weapon, state.ConfirmationCount)
 		if state.ConfirmationCount >= brandishingConfirmFrames {
 			if timestamp.Sub(state.lastAlerted) < brandishingCooldown {

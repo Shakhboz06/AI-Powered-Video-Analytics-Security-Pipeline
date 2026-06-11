@@ -2,6 +2,12 @@ import logging
 import os
 import threading
 import time
+import random
+
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+    "rtsp_transport;tcp|stimeout;10000000"
+)
+
 import cv2
 from dotenv import load_dotenv
 from confluent_kafka import Producer
@@ -24,9 +30,11 @@ producer = Producer({
 })
 print(f"📡 Ingestor: reading from {CAMERA_URL} @ {FPS} FPS → topic {TOPIC}")
 
-# ─── OpenCV capture setup ────────────────────────────────────────────────────────────
+
 
 interval = 1.0 / FPS
+base_backoff = 2
+max_backoff = 10
 def fetch_cameras():
     response = httpx.get(CAMERA_URL, headers={"X-API-Key": AUTH_API_KEY})
     response.raise_for_status()
@@ -34,6 +42,8 @@ def fetch_cameras():
 
 def run_camera(camera, stop_event):
     cap = cv2.VideoCapture(camera['video_source'])
+    backoff = base_backoff
+
     if not cap.isOpened():
         logging.error("Failed to open camera/video source")
         return
@@ -43,18 +53,26 @@ def run_camera(camera, stop_event):
             t0 = time.time()
             ret, frame = cap.read()
             if not ret:
-                print("Frame read failed, rewinding…")
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                time.sleep(interval)
-                continue
+                print("Frame read failed, reconnecting…")
+                cap.release()
+                cap = cv2.VideoCapture(camera['video_source'])
+                if not cap.isOpened():
+                    sleep_time = backoff * random.uniform(0.8, 1.2)
+                    time.sleep(sleep_time)
+                    backoff = min(backoff * 2, max_backoff)
+                continue            
+        
+            backoff = base_backoff
 
-            # 1) resize to 640×480
+        # cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            
+
+
             small = cv2.resize(frame, (640, 480))
-            # 2) encode at 50% JPEG quality
+
             _, jpg = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
             jpg_bytes = jpg.tobytes()
 
-            # build message
 
             timestamp = int(time.time() * 1000)
 

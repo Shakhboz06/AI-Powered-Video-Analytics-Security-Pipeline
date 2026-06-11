@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+
 	"log"
+	"net"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -10,15 +12,16 @@ import (
 
 	"video-analytics-pipe/config"
 	"video-analytics-pipe/dashboard/internal/auth"
-	"video-analytics-pipe/db/redis/cache"
 	"video-analytics-pipe/dashboard/middleware"
 	"video-analytics-pipe/db/postgres"
+	"video-analytics-pipe/db/redis/cache"
 
 	"video-analytics-pipe/dashboard/cmd/api"
 	"video-analytics-pipe/dashboard/internal/store"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -50,7 +53,7 @@ func main() {
 	r.Use(middleware.TimeoutMiddleware(2 * time.Second))
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR",""))},
+		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR", ""))},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Accept", "Content-Type", "Authorization", "X-CSRF-Token", "X-API-Key"},
 		ExposeHeaders:    []string{"Link"},
@@ -93,7 +96,7 @@ func main() {
 	apis.GET("/alerts", api.GetAllAlerts(alertStore))
 	apis.PATCH("/alerts/:id", api.UpdateAlertStatus(alertStore))
 	apis.GET("/alerts/stream", api.StreamAlerts(rdb))
-	
+
 	cameraStore := store.NewCameraStore(database)
 	apis.POST("/cameras", api.CreateCamera(cameraStore))
 	apis.GET("cameras", api.GetCameraList(cameraStore))
@@ -101,11 +104,115 @@ func main() {
 	apis.DELETE("cameras/:id", api.DeleteCamera(cameraStore))
 
 	// ─── Start server ──────────────────────────────
-	r.GET("/healthz", func(ctx *gin.Context) {
-		if err := database.PingContext(ctx); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+	r.GET("/healthz", func(c *gin.Context) {
+
+		reqCtx, cancel := context.WithTimeout(c, 2*time.Second)
+		defer cancel()
+
+		g, ctx := errgroup.WithContext(reqCtx)
+
+		type ServiceCheck struct {
+			Service string `json:"service"`
+			Status  string `json:status`
+			Err     string `json:"error,omitempty"`
+		}
+
+		errs := make(chan ServiceCheck, 3)
+
+		g.Go(func() error {
+			err := database.PingContext(ctx)
+
+			if err != nil {
+				errs <- ServiceCheck{
+					Service: "postgres",
+					Status:  "failed",
+					Err:     err.Error(),
+				}
+
+				return err
+			}
+
+			errs <- ServiceCheck{
+				Service: "postgres",
+				Status:  "ok",
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+
+			err := rdb.Ping(reqCtx).Err()
+			if err != nil {
+				errs <- ServiceCheck{
+					Service: "redis",
+					Status:  "failed",
+					Err:     err.Error(),
+				}
+
+				return err
+			}
+
+			errs <- ServiceCheck{
+				Service: "redis",
+				Status:  "ok",
+			}
+
+			return nil
+		})
+
+		g.Go(func() error {
+			kafkaConfig := config.GetString("KAFKA_BROKER", "")
+
+			conn, err := (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", kafkaConfig)
+
+			if err != nil {
+				errs <- ServiceCheck{
+					Service: "kafka",
+					Status:  "failed",
+					Err:     err.Error(),
+				}
+
+				return err
+			}
+
+			defer conn.Close()
+
+			errs <- ServiceCheck{
+				Service: "kafka",
+				Status:  "ok",
+			}
+			return nil
+		})
+
+		err := g.Wait()
+		close(errs)
+
+		var res []ServiceCheck
+
+		if err != nil {
+
+			for e := range errs {
+				res = append(res, e)
+			}
+
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "degraded",
+				"checks": res,
+			})
+
+			return
 		} else {
-			ctx.JSON(http.StatusOK, gin.H{"check": "healthy"})
+
+			for e := range errs {
+				res = append(res, e)
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"status": "ok",
+				"checks": res,
+			})
+			return
 		}
 	})
 
@@ -131,7 +238,7 @@ func main() {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatal("Server forced to shutdown:", err)
 	}

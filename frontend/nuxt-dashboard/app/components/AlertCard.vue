@@ -1,10 +1,11 @@
 <template>
   <article
-    class="rounded-xl border p-4 transition-all duration-300"
+    class="alert-card-premium app-card app-card-hover cursor-pointer p-4 md:p-5"
     :class="[
       borderClass,
-      highlight ? 'ring-1 ring-amber-400/40 scale-[1.01]' : '',
+      highlight ? 'ring-1 ring-amber-400/50 scale-[1.01] shadow-[0_0_32px_-8px_rgba(251,191,36,0.35)]' : '',
     ]"
+    @click="$emit('open', alert)"
   >
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="flex gap-3 min-w-0">
@@ -20,6 +21,25 @@
               class="text-gray-200 font-mono"
             >{{ relativeTime }}</time>
             <span
+              v-if="alert.alert_type"
+              class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium border"
+              :class="meta.badgeClass"
+            >
+              <svg
+                class="h-3.5 w-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path v-for="(d, i) in meta.iconPaths" :key="i" :d="d" />
+              </svg>
+              {{ meta.label }}
+            </span>
+            <span
               class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium border"
               :class="statusBadgeClass"
             >{{ alert.status }}</span>
@@ -30,13 +50,16 @@
             <span class="text-gray-500">Zone: </span> {{ alert.zone_name || '—' }}
           </p>
           <p class="text-sm text-gray-400">
-            <span class="text-gray-500">Object: </span> {{ alert.label }}
+            <span class="text-gray-500">Object: </span> {{ objectLabel }}
             <span class="text-gray-600 mx-1.5">·</span>
-            <span class="text-gray-500">Tracker: </span>
-            <span class="font-mono text-gray-200">{{ alert.tracker_id }}</span>
-          </p>
-          <p v-if="alert.alert_type" class="text-xs text-gray-500">
-            Type: <span class="uppercase tracking-wide text-gray-300">{{ alert.alert_type }}</span>
+            <template v-if="isSceneLevel">
+              <span class="text-gray-500">Scope: </span>
+              <span class="text-gray-200">Scene-wide</span>
+            </template>
+            <template v-else>
+              <span class="text-gray-500">Tracker: </span>
+              <span class="font-mono text-gray-200">{{ alert.tracker_id }}</span>
+            </template>
           </p>
           <p v-if="alert.severity" class="text-xs text-gray-500">
             Severity: <span class="uppercase tracking-wide" :class="severityTextClass">{{ alert.severity }}</span>
@@ -44,24 +67,32 @@
           <p v-if="bboxText" class="text-xs text-gray-500 font-mono truncate" :title="bboxText">
             Box:  {{ bboxText }}
           </p>
+          <div v-if="hasBox" class="pt-1 max-w-[220px]">
+            <BoundingBoxPreview
+              :bound-box="alert.bound_box"
+              :color="meta.boxColor"
+              :label="boxLabel"
+              :src="cameraImageUrl(alert.camera)"
+            />
+          </div>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2 shrink-0 sm:pl-2">
         <button
           v-if="alert.status === 'new' && canUpdateStatus"
           type="button"
-          class="rounded-lg border border-amber-700/60 bg-amber-950/30 px-3 py-1.5 text-sm font-medium text-amber-200 hover:bg-amber-950/50 transition-colors"
+          class="btn-ghost-sm border-amber-700/50 bg-amber-950/25 text-amber-200 hover:bg-amber-950/40"
           :disabled="busy"
-          @click="$emit('acknowledge', alert.id)"
+          @click.stop="$emit('acknowledge', alert.id)"
         >
           {{ busy ? '…' : 'Acknowledge' }}
         </button>
         <button
           v-if="alert.status === 'acknowledged' && canUpdateStatus"
           type="button"
-          class="rounded-lg border border-emerald-800/60 bg-emerald-950/20 px-3 py-1.5 text-sm font-medium text-emerald-200/90 hover:bg-emerald-950/40 transition-colors"
+          class="btn-ghost-sm border-emerald-800/50 bg-emerald-950/20 text-emerald-200 hover:bg-emerald-950/35"
           :disabled="busy"
-          @click="$emit('resolve', alert.id)"
+          @click.stop="$emit('resolve', alert.id)"
         >
           {{ busy ? '…' : 'Resolve' }}
         </button>
@@ -80,6 +111,8 @@
 
 <script setup lang="ts">
 import { formatRelativeAgo } from '~/composables/useRelativeTime'
+import { getAlertMeta, normalizeAlertType } from '~/composables/useAlertMeta'
+import BoundingBoxPreview from '~/components/security/BoundingBoxPreview.vue'
 import type { SecurityAlert } from '~/types/security'
 
 const props = defineProps<{
@@ -94,10 +127,33 @@ const props = defineProps<{
 defineEmits<{
   acknowledge: [id: number]
   resolve: [id: number]
+  open: [alert: SecurityAlert]
 }>()
 
 const busy = computed(() => props.busyId === props.alert.id)
 const canUpdateStatus = computed(() => props.alert.id > 0)
+
+const meta = computed(() => getAlertMeta(props.alert.alert_type))
+
+/** Scene-level alerts (e.g. fighting) carry tracker_id 0 — show scope, not a tracker. */
+const isSceneLevel = computed(() => meta.value.sceneLevel === true || props.alert.tracker_id === 0)
+
+const objectLabel = computed(() => {
+  if (props.alert.label === 'person_group') return 'Group of people'
+  return props.alert.label
+})
+
+const hasBox = computed(() => {
+  const b = props.alert.bound_box
+  return !!b && b.length >= 4 && (b[2] - b[0]) > 0 && (b[3] - b[1]) > 0
+})
+
+const boxLabel = computed(() => {
+  const key = normalizeAlertType(props.alert.alert_type)
+  if (key === 'fighting') return 'FIGHT'
+  if (key === 'falling') return 'FALL'
+  return (props.alert.label || meta.value.label).toUpperCase().slice(0, 12)
+})
 
 const relativeTime = computed(() => {
   props.nowTick
@@ -117,15 +173,20 @@ const bboxText = computed(() => {
 })
 
 const borderClass = computed(() => {
-  if (props.alert.status === 'new') return 'border-red-900/50 bg-red-950/10'
+  if (props.alert.status === 'new') {
+    if (normalizeAlertType(props.alert.alert_type) === 'fighting') return 'border-orange-800/60 bg-orange-950/15'
+    return 'border-red-900/50 bg-red-950/10'
+  }
   if (props.alert.status === 'acknowledged') return 'border-amber-900/40 bg-amber-950/5'
-  return 'border-gray-800 bg-[#12181f]/80'
+  return 'opacity-70'
 })
 
+/** Active (new/ack) alerts colour the stripe by type; resolved ones stay neutral. */
 const statusStripeClass = computed(() => {
+  if (props.alert.status === 'resolved') return 'bg-gray-500'
+  if (props.alert.alert_type) return meta.value.stripeClass
   if (props.alert.status === 'new') return 'bg-red-500'
-  if (props.alert.status === 'acknowledged') return 'bg-amber-400'
-  return 'bg-gray-500'
+  return 'bg-amber-400'
 })
 
 const statusBadgeClass = computed(() => {

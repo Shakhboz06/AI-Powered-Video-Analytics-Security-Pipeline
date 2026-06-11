@@ -1,25 +1,28 @@
 <template>
   <div class="space-y-6">
-    <header>
-      <h1 class="text-xl font-semibold text-gray-100">System health</h1>
-      <p class="mt-1 text-sm text-gray-500">Latency trends and high-latency incidents</p>
-    </header>
+    <PageHeader
+      eyebrow="Reliability"
+      title="System Health"
+      subtitle="Latency trends and high-latency incidents across your camera fleet."
+    />
 
-    <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+    <FilterToolbar>
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500 uppercase tracking-wide">Camera</label>
+        <label class="app-label" for="health-camera">Camera</label>
         <select
+          id="health-camera"
           v-model="selectedCamera"
-          class="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+          class="app-input min-w-[200px]"
         >
           <option v-for="c in cameras" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500 uppercase tracking-wide">Range</label>
+        <label class="app-label" for="health-range">Range</label>
         <select
+          id="health-range"
           v-model="rangePreset"
-          class="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+          class="app-input min-w-[200px]"
         >
           <option value="5m">Last 5 minutes</option>
           <option value="15m">Last 15 minutes</option>
@@ -29,52 +32,64 @@
         </select>
       </div>
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500 uppercase tracking-wide">Threshold (ms)</label>
+        <label class="app-label" for="health-threshold">Threshold (ms)</label>
         <input
+          id="health-threshold"
           v-model.number="threshold"
           type="number"
           min="1"
           step="1"
-          class="w-32 rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+          class="app-input w-32"
           @change="onThresholdCommitted"
         >
       </div>
-      <button
-        type="button"
-        class="rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium px-4 py-2 self-end"
-        :disabled="loading"
-        @click="refresh"
-      >
-        {{ loading ? 'Loading…' : 'Refresh' }}
-      </button>
-    </div>
+      <template #actions>
+        <button
+          type="button"
+          class="btn-primary"
+          :disabled="loading"
+          @click="refresh"
+        >
+          {{ loading ? 'Loading…' : 'Refresh' }}
+        </button>
+      </template>
+    </FilterToolbar>
 
-    <div v-if="pageError" class="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-      {{ pageError }}
-    </div>
+    <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">Avg latency</p>
-        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">{{ fmt(stats.avg) }}</p>
+      <div class="kpi-card">
+        <p class="app-label">Avg latency</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
+          <AnimatedNumber v-if="stats.avg != null" :value="stats.avg" :decimals="2" /><span v-else>—</span>
+        </p>
+        <div v-if="latencySpark.length > 1" class="mt-2"><Sparkline :data="latencySpark" color="#2dd4bf" /></div>
       </div>
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">P95 latency</p>
-        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">{{ fmt(stats.p95) }}</p>
+      <div class="kpi-card">
+        <p class="app-label">P95 latency</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
+          <AnimatedNumber v-if="stats.p95 != null" :value="stats.p95" :decimals="2" /><span v-else>—</span>
+        </p>
+        <div v-if="latencySpark.length > 1" class="mt-2"><Sparkline :data="latencySpark" color="#22d3ee" /></div>
       </div>
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">P99 latency</p>
-        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">{{ fmt(stats.p99) }}</p>
+      <div class="kpi-card">
+        <p class="app-label">P99 latency</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
+          <AnimatedNumber v-if="stats.p99 != null" :value="stats.p99" :decimals="2" /><span v-else>—</span>
+        </p>
+        <div v-if="latencySpark.length > 1" class="mt-2"><Sparkline :data="latencySpark" color="#818cf8" /></div>
       </div>
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">High-latency frames</p>
-        <p class="mt-2 text-2xl font-semibold tabular-nums text-red-300">{{ stats.incidentCount ?? '—' }}</p>
+      <div class="kpi-card">
+        <p class="app-label">High-latency frames</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums text-red-300">
+          <AnimatedNumber v-if="stats.incidentCount != null" :value="stats.incidentCount" /><span v-else>—</span>
+        </p>
       </div>
     </section>
 
     <div class="grid gap-6 xl:grid-cols-2">
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-5">
-        <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Latency timeline</h3>
+      <div class="app-card p-5">
+        <h3 class="app-section-title mb-4">Latency timeline</h3>
         <ClientOnly>
           <VueApexCharts
             v-if="latencySeries[0]?.data?.length"
@@ -84,11 +99,11 @@
             :series="latencySeries"
           />
           <div v-else class="h-[320px] flex items-center justify-center text-gray-500 text-sm">No latency samples</div>
-          <template #fallback><div class="h-[320px] flex items-center justify-center text-gray-500">Loading…</div></template>
+          <template #fallback><div class="h-[320px] p-1"><Skeleton width="100%" height="100%" rounded="rounded-lg" /></div></template>
         </ClientOnly>
       </div>
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-5">
-        <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Latency distribution</h3>
+      <div class="app-card p-5">
+        <h3 class="app-section-title mb-4">Latency distribution</h3>
         <ClientOnly>
           <VueApexCharts
             v-if="latencyHistogram.counts.length"
@@ -98,19 +113,19 @@
             :series="histSeries"
           />
           <div v-else class="h-[320px] flex items-center justify-center text-gray-500 text-sm">Not enough data for histogram</div>
-          <template #fallback><div class="h-[320px] flex items-center justify-center text-gray-500">Loading…</div></template>
+          <template #fallback><div class="h-[320px] p-1"><Skeleton width="100%" height="100%" rounded="rounded-lg" /></div></template>
         </ClientOnly>
       </div>
     </div>
 
-    <div class="rounded-xl border border-gray-800 bg-[#12181f] overflow-hidden">
-      <div class="px-5 py-4 border-b border-gray-800">
-        <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide">High latency incidents</h3>
+    <div class="app-card overflow-hidden">
+      <div class="px-5 py-4 border-b border-white/[0.06]">
+        <h3 class="app-section-title">High latency incidents</h3>
         <p class="text-xs text-gray-500 mt-1">Frames where latency exceeded {{ threshold }} ms</p>
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full text-left text-sm">
-          <thead class="bg-gray-900/50 text-xs uppercase text-gray-500">
+          <thead class="bg-white/[0.02] text-xs uppercase text-gray-500">
             <tr>
               <th class="px-4 py-3 cursor-pointer hover:text-gray-300" @click="toggleSort('time')">Time {{ sortArrow('time') }}</th>
               <th class="px-4 py-3 cursor-pointer hover:text-gray-300" @click="toggleSort('camera')">Camera {{ sortArrow('camera') }}</th>
@@ -118,11 +133,11 @@
               <th class="px-4 py-3 text-right cursor-pointer hover:text-gray-300" @click="toggleSort('detections')">Detections {{ sortArrow('detections') }}</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-800/80">
+          <tbody class="divide-y divide-white/[0.06]">
             <tr v-if="!sortedRows.length">
               <td colspan="4" class="px-4 py-8 text-center text-gray-500">No incidents in this range</td>
             </tr>
-            <tr v-for="(row, i) in sortedRows" :key="i" class="hover:bg-gray-900/30">
+            <tr v-for="(row, i) in sortedRows" :key="i" class="transition-colors hover:bg-white/[0.02]">
               <td class="px-4 py-2.5 font-mono text-gray-300 whitespace-nowrap">{{ row.time }}</td>
               <td class="px-4 py-2.5 text-gray-300">{{ row.camera }}</td>
               <td class="px-4 py-2.5 text-right tabular-nums text-red-300">{{ row.latency.toFixed(2) }}</td>
@@ -136,6 +151,9 @@
 </template>
 
 <script setup lang="ts">
+import Skeleton from '~/components/ui/Skeleton.vue'
+import AnimatedNumber from '~/components/ui/AnimatedNumber.vue'
+import Sparkline from '~/components/ui/Sparkline.vue'
 import { formatAxisInteger, useChartTheme } from '~/composables/useChartTheme'
 
 definePageMeta({
@@ -275,10 +293,7 @@ function sortArrow(key: SortKey) {
   return sortDir.value === 'asc' ? '▲' : '▼'
 }
 
-function fmt(n: number | null) {
-  if (n == null || Number.isNaN(n)) return '—'
-  return n.toFixed(2)
-}
+const latencySpark = computed(() => latencies.value.map(l => l.ms))
 
 function computeRange() {
   const end = new Date()

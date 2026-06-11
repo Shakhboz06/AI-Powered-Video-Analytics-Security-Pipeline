@@ -1,25 +1,28 @@
 <template>
   <div class="space-y-6">
-    <header>
-      <h1 class="text-xl font-semibold text-gray-100">Analytics</h1>
-      <p class="mt-1 text-sm text-gray-500">Historical detection metrics for the selected camera and time range</p>
-    </header>
+    <PageHeader
+      eyebrow="Insights"
+      title="Analytics"
+      subtitle="Historical detection metrics for the selected camera and time range."
+    />
 
-    <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+    <FilterToolbar>
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500 uppercase tracking-wide">Camera</label>
+        <label class="app-label" for="analytics-camera">Camera</label>
         <select
+          id="analytics-camera"
           v-model="selectedCamera"
-          class="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+          class="app-input min-w-[200px]"
         >
           <option v-for="c in cameras" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500 uppercase tracking-wide">Range</label>
+        <label class="app-label" for="analytics-range">Range</label>
         <select
+          id="analytics-range"
           v-model="rangePreset"
-          class="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+          class="app-input min-w-[200px]"
         >
           <option value="5m">Last 5 minutes</option>
           <option value="15m">Last 15 minutes</option>
@@ -31,74 +34,83 @@
       </div>
       <div v-if="rangePreset === 'custom'" class="flex flex-wrap gap-3">
         <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-500">Start</label>
+          <label class="app-label">Start</label>
           <input
             v-model="customStart"
             type="datetime-local"
-            class="rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+            class="app-input"
           >
         </div>
         <div class="flex flex-col gap-1">
-          <label class="text-xs text-gray-500">End</label>
+          <label class="app-label">End</label>
           <input
             v-model="customEnd"
             type="datetime-local"
-            class="rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+            class="app-input"
           >
         </div>
       </div>
-      <button
-        type="button"
-        class="rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium px-4 py-2 self-end"
-        :disabled="loading"
-        @click="refresh"
-      >
-        {{ loading ? 'Loading…' : 'Refresh' }}
-      </button>
-    </div>
+      <template #actions>
+        <button
+          type="button"
+          class="btn-primary"
+          :disabled="loading"
+          @click="refresh"
+        >
+          {{ loading ? 'Loading…' : 'Refresh' }}
+        </button>
+      </template>
+    </FilterToolbar>
 
-    <div v-if="pageError" class="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-      {{ pageError }}
-    </div>
+    <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div v-for="card in summaryCards" :key="card.label" class="rounded-xl border border-gray-800 bg-[#12181f] p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">{{ card.label }}</p>
-        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">{{ card.value }}</p>
+      <div v-for="card in summaryCards" :key="card.label" class="kpi-card">
+        <p class="app-label">{{ card.label }}</p>
+        <p class="mt-2 text-2xl font-semibold tabular-nums text-gray-100">
+          <AnimatedNumber v-if="card.num != null" :value="card.num" :decimals="card.decimals" />
+          <span v-else>—</span>
+        </p>
+        <div v-if="card.spark.length > 1" class="mt-2">
+          <Sparkline :data="card.spark" :color="card.color" />
+        </div>
       </div>
     </section>
 
     <div class="grid gap-6 xl:grid-cols-2">
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-5">
-        <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Detections over time</h3>
+      <div class="app-card p-5">
+        <h3 class="app-section-title mb-4">Detections over time</h3>
         <ClientOnly>
           <VueApexCharts v-if="timelineSeries.length" type="area" height="320" :options="timelineOptions" :series="timelineSeries" />
           <div v-else class="h-[320px] flex items-center justify-center text-gray-500 text-sm">No timeline data</div>
-          <template #fallback><div class="h-[320px] flex items-center justify-center text-gray-500">Loading…</div></template>
+          <template #fallback><div class="h-[320px] p-1"><Skeleton width="100%" height="100%" rounded="rounded-lg" /></div></template>
         </ClientOnly>
       </div>
-      <div class="rounded-xl border border-gray-800 bg-[#12181f] p-5">
-        <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Class counts over time</h3>
+      <div class="app-card p-5">
+        <h3 class="app-section-title mb-4">Class counts over time</h3>
         <ClientOnly>
           <VueApexCharts v-if="classSeries.length" type="line" height="320" :options="classChartOptions" :series="classSeries" />
           <div v-else class="h-[320px] flex items-center justify-center text-gray-500 text-sm">No per-class series</div>
-          <template #fallback><div class="h-[320px] flex items-center justify-center text-gray-500">Loading…</div></template>
+          <template #fallback><div class="h-[320px] p-1"><Skeleton width="100%" height="100%" rounded="rounded-lg" /></div></template>
         </ClientOnly>
       </div>
     </div>
 
-    <div class="rounded-xl border border-gray-800 bg-[#12181f] p-5">
-      <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">Total detections by class (range)</h3>
+    <div class="app-card p-5">
+      <h3 class="app-section-title mb-4">Total detections by class (range)</h3>
       <ClientOnly>
         <VueApexCharts v-if="barSeries.length" type="bar" height="360" :options="barOptions" :series="barSeries" />
         <div v-else class="h-[360px] flex items-center justify-center text-gray-500 text-sm">No class aggregates</div>
-        <template #fallback><div class="h-[360px] flex items-center justify-center text-gray-500">Loading…</div></template>
+        <template #fallback><div class="h-[360px] p-1"><Skeleton width="100%" height="100%" rounded="rounded-lg" /></div></template>
       </ClientOnly>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import Skeleton from '~/components/ui/Skeleton.vue'
+import AnimatedNumber from '~/components/ui/AnimatedNumber.vue'
+import Sparkline from '~/components/ui/Sparkline.vue'
 import { formatAxisInteger, useChartTheme } from '~/composables/useChartTheme'
 
 definePageMeta({
@@ -175,17 +187,14 @@ function computeRange(): { start: Date; end: Date } | null {
   return { start: new Date(end.getTime() - delta), end }
 }
 
-const summaryCards = computed(() => [
-  { label: 'Avg detections / frame', value: formatMaybe(summaryStats.value.avgDetections, 2) },
-  { label: 'Peak detections', value: formatMaybe(summaryStats.value.peakDetections, 0) },
-  { label: 'Total detections', value: formatMaybe(summaryStats.value.totalDetections, 0) },
-  { label: 'Avg latency (ms)', value: formatMaybe(summaryStats.value.avgLatency, 2) },
-])
+const totalsSpark = computed(() => metricsData.value?.totals ?? [])
 
-function formatMaybe(n: number | null, digits: number) {
-  if (n == null || Number.isNaN(n)) return '—'
-  return n.toFixed(digits)
-}
+const summaryCards = computed(() => [
+  { label: 'Avg detections / frame', num: summaryStats.value.avgDetections, decimals: 2, spark: totalsSpark.value, color: '#2dd4bf' },
+  { label: 'Peak detections', num: summaryStats.value.peakDetections, decimals: 0, spark: totalsSpark.value, color: '#22d3ee' },
+  { label: 'Total detections', num: summaryStats.value.totalDetections, decimals: 0, spark: totalsSpark.value, color: '#818cf8' },
+  { label: 'Avg latency (ms)', num: summaryStats.value.avgLatency, decimals: 2, spark: [] as number[], color: '#fbbf24' },
+])
 
 const timelineSeries = computed(() => {
   const m = metricsData.value

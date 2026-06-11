@@ -1,57 +1,65 @@
 <template>
   <div class="space-y-6">
-    <header>
-      <h1 class="text-xl font-semibold text-gray-100">Zones</h1>
-      <p class="mt-1 text-sm text-gray-500">Draw restricted areas on a {{ FRAME_W }}×{{ FRAME_H }} representative frame (placeholder imagery per camera until live frames are available). Schedules are evaluated in UTC.</p>
-      <p v-if="liveSummary" class="mt-2 text-xs text-gray-400 font-mono border-l-2 border-teal-600/50 pl-2">
-        Latest live: {{ liveSummary }}
-      </p>
-      <p v-else-if="selectedCamera && liveLoading" class="mt-2 text-xs text-gray-500">Loading live metadata…</p>
-    </header>
+    <PageHeader
+      eyebrow="Geofencing"
+      title="Zones"
+      subtitle="Draw restricted areas on a representative frame. Schedules are evaluated in UTC."
+    >
+      <template v-if="liveSummary || (selectedCamera && liveLoading)" #actions>
+        <span v-if="liveSummary" class="app-chip font-mono text-xs text-gray-400">
+          Latest: {{ liveSummary }}
+        </span>
+        <span v-else-if="selectedCamera && liveLoading" class="app-chip text-xs text-gray-500">
+          Loading live metadata…
+        </span>
+      </template>
+    </PageHeader>
 
-    <div class="flex flex-wrap items-end gap-4">
+    <FilterToolbar>
       <div class="flex flex-col gap-1">
-        <label class="text-xs text-gray-500 uppercase tracking-wide">Camera</label>
+        <label class="app-label" for="zones-camera">Camera</label>
         <select
+          id="zones-camera"
           v-model="selectedCamera"
-          class="min-w-[200px] rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+          class="app-input min-w-[200px]"
           :disabled="camerasLoading && !cameras.length"
         >
           <option v-if="!cameras.length" value="">No cameras</option>
           <option v-for="c in cameras" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
-      <button
-        v-if="selectedCamera"
-        type="button"
-        class="rounded-lg border border-gray-600 bg-gray-800/60 px-4 py-2 text-sm text-gray-200 hover:bg-gray-800"
-        :disabled="!selectedCamera || saving || isDrawing"
-        @click="startAddZone"
-      >
-        Add zone
-      </button>
-      <button
-        v-if="isDrawing && !isDraftComplete"
-        type="button"
-        class="rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium px-4 py-2"
-        :disabled="draft.length < 3"
-        @click="finishPolygon"
-      >
-        Finish
-      </button>
-      <button
-        v-if="isDrawing"
-        type="button"
-        class="rounded-lg border border-red-800/50 px-4 py-2 text-sm text-red-300"
-        @click="cancelDraw"
-      >
-        Cancel
-      </button>
-    </div>
+      <template #actions>
+        <button
+          v-if="selectedCamera"
+          type="button"
+          class="btn-ghost"
+          :disabled="!selectedCamera || saving || isDrawing"
+          @click="startAddZone"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+          Add zone
+        </button>
+        <button
+          v-if="isDrawing && !isDraftComplete"
+          type="button"
+          class="btn-primary"
+          :disabled="draft.length < 3"
+          @click="finishPolygon"
+        >
+          Finish
+        </button>
+        <button
+          v-if="isDrawing"
+          type="button"
+          class="btn-ghost text-red-300 hover:text-red-200"
+          @click="cancelDraw"
+        >
+          Cancel
+        </button>
+      </template>
+    </FilterToolbar>
 
-    <div v-if="pageError" class="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-      {{ pageError }}
-    </div>
+    <div v-if="pageError" class="app-banner-error">{{ pageError }}</div>
 
     <div class="grid gap-6 lg:grid-cols-[1fr,320px]">
       <div>
@@ -70,18 +78,38 @@
         />
       </div>
 
-      <aside class="rounded-xl border border-gray-800 bg-[#12181f] p-4 h-fit max-h-[min(80vh,720px)] overflow-y-auto">
-        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Zones for this camera</h2>
-        <p v-if="!selectedCamera" class="text-sm text-gray-500">Select a camera</p>
-        <p v-else-if="zonesLoading" class="text-sm text-gray-500">Loading…</p>
-        <p v-else-if="!zonesList.length" class="text-sm text-gray-500">No zones yet</p>
+      <aside class="app-card p-4 h-fit max-h-[min(80vh,720px)] overflow-y-auto">
+        <h2 class="app-section-title mb-3">Zones for this camera</h2>
+        <EmptyState
+          v-if="!selectedCamera"
+          icon="zone"
+          title="Select a camera"
+          message="Choose a camera to view and manage its restricted zones."
+          class="py-6"
+        />
+        <div v-else-if="zonesLoading" class="space-y-2 py-2">
+          <Skeleton v-for="i in 3" :key="i" width="100%" height="4rem" rounded="rounded-xl" />
+        </div>
+        <EmptyState
+          v-else-if="!zonesList.length"
+          icon="zone"
+          title="No zones yet"
+          message="Draw your first restricted area on the frame to start generating zone alerts."
+          class="py-6"
+        >
+          <template #action>
+            <button type="button" class="btn-primary" :disabled="isDrawing" @click="startAddZone">
+              Add zone
+            </button>
+          </template>
+        </EmptyState>
         <ul v-else class="space-y-2">
           <li
             v-for="z in zonesList"
             :key="z.id"
             @click="selectedZoneId = z.id"
-            class="rounded-lg border p-3 cursor-pointer transition-colors"
-            :class="z.id === selectedZoneId ? 'border-teal-500/50 bg-teal-950/20' : 'border-gray-800 hover:border-gray-700 bg-gray-900/30'"
+            class="rounded-xl border p-3 cursor-pointer transition-all duration-200"
+            :class="z.id === selectedZoneId ? 'border-teal-500/50 bg-teal-500/[0.08] ring-1 ring-teal-500/20' : 'border-white/[0.06] hover:border-white/10 bg-white/[0.02] hover:bg-white/[0.04]'"
           >
             <div class="flex items-start justify-between gap-2">
               <p class="text-sm font-medium text-gray-200 truncate">{{ z.name }}</p>
@@ -114,35 +142,28 @@
       </aside>
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="showModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-        @click.self="closeModal"
-      >
-        <div
-          class="w-full max-w-md rounded-xl border border-gray-700 bg-[#12181f] p-5 shadow-xl"
-          @keydown.esc="closeModal"
-        >
-          <h3 class="text-lg font-semibold text-gray-100">
-            {{ modalMode === 'create' ? 'New zone' : 'Edit zone' }}
-          </h3>
-          <div class="mt-4 space-y-4">
+    <AppModal
+      :open="showModal"
+      :title="modalMode === 'create' ? 'New zone' : 'Edit zone'"
+      subtitle="Configure zone name, schedule, and alert thresholds."
+      @close="closeModal"
+    >
+      <div class="space-y-4">
             <div>
-              <label class="text-xs text-gray-500 uppercase">Name <span class="text-red-400">*</span></label>
+              <label class="app-label mb-1.5 block">Name <span class="text-red-400">*</span></label>
               <input
                 v-model="form.name"
                 type="text"
-                class="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+                class="app-input w-full"
                 placeholder="e.g. Loading dock"
               >
             </div>
-            <div class="flex items-center gap-2">
-              <input id="z-active" v-model="form.is_active" type="checkbox" class="rounded border-gray-600">
-              <label for="z-active" class="text-sm text-gray-300">Active</label>
-            </div>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-300">
+              <input id="z-active" v-model="form.is_active" type="checkbox" class="app-checkbox">
+              Active
+            </label>
             <div>
-              <p class="text-xs text-gray-500 uppercase mb-2">Schedule</p>
+              <p class="app-label mb-2">Schedule</p>
               <div class="flex flex-col gap-2">
                 <label class="flex items-center gap-2 text-sm text-gray-300">
                   <input v-model="form.schedule" type="radio" value="always" class="border-gray-600"> Always
@@ -156,7 +177,7 @@
                     <input
                       v-model="form.activeFrom"
                       type="time"
-                      class="mt-0.5 block rounded-lg border border-gray-700 bg-gray-900/80 px-2 py-1.5 text-sm text-gray-200"
+                      class="app-input mt-0.5 block px-2 py-1.5"
                     >
                   </div>
                   <div>
@@ -164,28 +185,28 @@
                     <input
                       v-model="form.activeUntil"
                       type="time"
-                      class="mt-0.5 block rounded-lg border border-gray-700 bg-gray-900/80 px-2 py-1.5 text-sm text-gray-200"
+                      class="app-input mt-0.5 block px-2 py-1.5"
                     >
                   </div>
                 </div>
               </div>
             </div>
             <div>
-              <label class="text-xs text-gray-500 uppercase">Loiter threshold (seconds)</label>
+              <label class="app-label mb-1.5 block">Loiter threshold (seconds)</label>
               <input
                 v-model.number="form.loiterThresholdSeconds"
                 type="number"
                 min="1"
                 step="1"
-                class="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+                class="app-input w-full"
                 placeholder="Optional (e.g. 30)"
               >
             </div>
             <div>
-              <label class="text-xs text-gray-500 uppercase">Default severity</label>
+              <label class="app-label mb-1.5 block">Default severity</label>
               <select
                 v-model="form.defaultSeverity"
-                class="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900/80 px-3 py-2 text-sm text-gray-200"
+                class="app-input w-full"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -203,36 +224,20 @@
                 @click="startChangeShape"
               >Change shape</button>
             </div>
-          </div>
-          <div class="mt-6 flex justify-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300"
-              :disabled="saving"
-              @click="closeModal"
-            >Cancel</button>
-            <button
-              type="button"
-              class="rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium px-4 py-2"
-              :disabled="saving || !form.name.trim() || !polygonForSave.length"
-              @click="submitForm"
-            >
-              {{ saving ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
-        </div>
       </div>
-    </Teleport>
+      <template #footer>
+        <button type="button" class="btn-ghost" :disabled="saving" @click="closeModal">Cancel</button>
+        <button
+          type="button"
+          class="btn-primary disabled:opacity-50"
+          :disabled="saving || !form.name.trim() || !polygonForSave.length"
+          @click="submitForm"
+        >
+          {{ saving ? 'Saving…' : 'Save' }}
+        </button>
+      </template>
+    </AppModal>
 
-    <Teleport to="body">
-      <div
-        v-if="successToast"
-        class="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg border border-emerald-800/60 bg-emerald-950/90 px-4 py-2.5 text-sm text-emerald-100 shadow-lg"
-        role="status"
-      >
-        {{ successToast }}
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -258,6 +263,8 @@ const ZONE_PALETTE = [
 ] as const
 
 const api = useApi()
+const toast = useToast()
+const confirm = useConfirm()
 
 const cameras = ref<string[]>([])
 const camerasLoading = ref(true)
@@ -298,18 +305,6 @@ const liveSnapshot = ref<{
 } | null>(null)
 const liveLoading = ref(false)
 let livePoll: ReturnType<typeof setInterval> | null = null
-
-const successToast = ref<string | null>(null)
-let toastTimer: ReturnType<typeof setTimeout> | null = null
-
-function showToast(msg: string) {
-  successToast.value = msg
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    successToast.value = null
-    toastTimer = null
-  }, 3200)
-}
 
 function sanitizeCameraFilePart(name: string) {
   const s = name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
@@ -385,7 +380,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (livePoll) clearInterval(livePoll)
-  if (toastTimer) clearTimeout(toastTimer)
 })
 
 watch(selectedCamera, async (cam) => {
@@ -585,11 +579,13 @@ async function submitForm() {
     }
     showModal.value = false
     polygonForSave.value = []
+    const created = modalMode.value === 'create'
     await loadZones(selectedCamera.value)
-    showToast(modalMode.value === 'create' ? 'Zone created' : 'Zone updated')
+    toast.success(created ? 'Zone created' : 'Zone updated', { description: body.name })
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Save failed'
+    toast.error('Failed to save zone')
   }
   finally {
     saving.value = false
@@ -597,15 +593,23 @@ async function submitForm() {
 }
 
 async function onDeleteZone(z: SecurityZone) {
-  if (!confirm(`Delete zone "${z.name}"?`)) return
+  const ok = await confirm.ask({
+    title: 'Delete zone?',
+    message: `"${z.name}" and its detection rules will be permanently removed.`,
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   pageError.value = null
   try {
     await api.deleteZone(z.id)
     if (selectedZoneId.value === z.id) selectedZoneId.value = null
     await loadZones(selectedCamera.value)
+    toast.success('Zone deleted', { description: z.name })
   }
   catch (e) {
     pageError.value = e instanceof Error ? e.message : 'Delete failed'
+    toast.error('Failed to delete zone')
   }
 }
 </script>
