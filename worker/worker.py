@@ -44,7 +44,7 @@ def decode_header(headers, key):
 class FallDetectorModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.lstm = nn.LSTM(input_size=34, hidden_size=64, batch_first=True)
+        self.lstm = nn.LSTM(input_size=51, hidden_size=64, batch_first=True)
         self.fc = nn.Linear(64, 1)
     
     def forward(self, x):
@@ -184,6 +184,7 @@ def process_frame(frame_bytes, stream_id, timestamp):
 
         
     keypoints = []
+    norm_keypoints = []
 
     for r in pose_results:
 
@@ -208,6 +209,24 @@ def process_frame(frame_bytes, stream_id, timestamp):
                     best_tracker_id = det['tracker_id']
 
             if best_tracker_id is not None and best_iou > 0.3:
+                box_x_min, box_y_min, box_x_max, box_y_max = pose_box
+                
+                box_width = box_x_max - box_x_min
+                box_height = box_y_max - box_y_min
+
+                if box_width == 0 or box_height == 0:
+                    continue
+
+                x_norm = (person_xy[:, 0] - box_x_min) / box_width
+                y_norm = (person_xy[:, 1] - box_y_min) / box_height
+
+                norm_keypoints.append({
+                    "tracker_id": best_tracker_id,
+                    "x_norm": x_norm,
+                    "y_norm": y_norm,
+                    "conf": person_conf
+                })
+
                 keypoints.append({
                     "tracker_id": best_tracker_id,
                     "points": {
@@ -215,6 +234,7 @@ def process_frame(frame_bytes, stream_id, timestamp):
                         "conf": person_conf.tolist()
                     }
                 })
+
 
 
     for w in weapon_results:
@@ -238,17 +258,20 @@ def process_frame(frame_bytes, stream_id, timestamp):
             })
     
     
-    for kp_entry in keypoints:
+    for kp_entry in norm_keypoints:
+        
         tracker_id = kp_entry['tracker_id']
-        xy_array = np.array(kp_entry['points']['xy'])  # (17, 2)
+        x_array = np.array(kp_entry['x_norm']) 
+        y_array = np.array(kp_entry['y_norm']) 
+        keypoint_conf = np.array(kp_entry['conf'])
         
-        # Normalize keypoints (same as training)
-        h, w = img.shape[:2]
-        xy_normalized = xy_array.copy()
-        xy_normalized[:, 0] /= w
-        xy_normalized[:, 1] /= h
+        kyp_arr = (x_array, y_array, keypoint_conf)
+        kyp_norm = np.column_stack(kyp_arr)
+
+        keypoint_history[stream_id][tracker_id].append(kyp_norm)
+
+        print("keypoints:shape:", kyp_norm.shape)   
         
-        keypoint_history[stream_id][tracker_id].append(xy_normalized)
 
     fall_predictions = {}
 
@@ -264,6 +287,7 @@ def process_frame(frame_bytes, stream_id, timestamp):
         
         
         sequence = np.array(list(history))  
+        print("sequence:", sequence)
         sequence = sequence.reshape(30, -1) 
         sequence_tensor = torch.FloatTensor(sequence).unsqueeze(0)
         

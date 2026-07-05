@@ -96,13 +96,14 @@ func main() {
 	apis.GET("/alerts", api.GetAllAlerts(alertStore))
 	apis.PATCH("/alerts/:id", api.UpdateAlertStatus(alertStore))
 	apis.GET("/alerts/stream", api.StreamAlerts(rdb))
+	apis.GET("/alerts/:alert_id/image", api.GetAlertImage())
+	
 
 	cameraStore := store.NewCameraStore(database)
 	apis.POST("/cameras", api.CreateCamera(cameraStore))
 	apis.GET("cameras", api.GetCameraList(cameraStore))
 	apis.PUT("cameras/:id", api.UpdateCamera(cameraStore))
 	apis.DELETE("cameras/:id", api.DeleteCamera(cameraStore))
-
 	// ─── Start server ──────────────────────────────
 
 	r.GET("/healthz", func(c *gin.Context) {

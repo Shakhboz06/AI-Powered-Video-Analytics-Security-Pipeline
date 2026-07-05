@@ -110,8 +110,14 @@ export interface ZoneListResponse {
 
 export type AlertStatus = 'new' | 'acknowledged' | 'resolved'
 
+export interface AlertImageResponse {
+  signed_url: string
+}
+
 export interface SecurityAlert {
   id: number
+  /** UUID used to fetch the captured frame from storage (`/alerts/:alert_id/image`). */
+  alert_id?: string | null
   camera: string
   zone_name: string
   zone_id: number | null

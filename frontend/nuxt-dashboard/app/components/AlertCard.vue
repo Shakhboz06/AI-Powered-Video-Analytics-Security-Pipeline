@@ -70,12 +70,13 @@
           <p v-if="bboxText" class="text-xs text-gray-500 font-mono truncate" :title="bboxText">
             Box:  {{ bboxText }}
           </p>
-          <div v-if="hasBox" class="pt-1 max-w-[220px]">
-            <BoundingBoxPreview
+          <div v-if="hasBox || alert.alert_id" class="pt-1 max-w-[220px]">
+            <AlertFramePreview
+              :alert-id="alert.alert_id"
+              :camera="alert.camera"
               :bound-box="alert.bound_box"
               :color="meta.boxColor"
               :label="boxLabel"
-              :src="cameraImageUrl(alert.camera)"
             />
           </div>
         </div>
@@ -115,7 +116,8 @@
 <script setup lang="ts">
 import { formatRelativeAgo } from '~/composables/useRelativeTime'
 import { getAlertMeta, normalizeAlertType } from '~/composables/useAlertMeta'
-import BoundingBoxPreview from '~/components/security/BoundingBoxPreview.vue'
+import { hasValidBoundBox } from '~/composables/useBoundBox'
+import AlertFramePreview from '~/components/security/AlertFramePreview.vue'
 import type { SecurityAlert } from '~/types/security'
 
 const props = defineProps<{
@@ -146,10 +148,7 @@ const objectLabel = computed(() => {
   return props.alert.label
 })
 
-const hasBox = computed(() => {
-  const b = props.alert.bound_box
-  return !!b && b.length >= 4 && (b[2] - b[0]) > 0 && (b[3] - b[1]) > 0
-})
+const hasBox = computed(() => hasValidBoundBox(props.alert.bound_box))
 
 const boxLabel = computed(() => {
   const key = normalizeAlertType(props.alert.alert_type)

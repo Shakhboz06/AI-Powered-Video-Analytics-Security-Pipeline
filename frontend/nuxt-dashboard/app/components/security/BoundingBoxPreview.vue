@@ -1,132 +1,149 @@
 <template>
   <div class="relative overflow-hidden rounded-lg border border-white/[0.06] bg-gray-950/60">
-    <img
-      v-if="src && !imgError"
-      :src="src"
-      alt=""
-      class="absolute inset-0 h-full w-full object-cover opacity-80"
-      @error="imgError = true"
-    >
-    <svg
-      :viewBox="`0 0 ${frameWidth} ${frameHeight}`"
-      class="relative w-full h-auto"
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
+    <canvas
+      ref="canvasRef"
+      :width="PIPELINE_FRAME_WIDTH"
+      :height="PIPELINE_FRAME_HEIGHT"
+      class="block w-full h-auto aspect-[4/3]"
       :aria-label="`${label} location overlay`"
-    >
-      <rect
-        v-if="!showImage"
-        :width="frameWidth"
-        :height="frameHeight"
-        fill="#0b0f14"
-      />
-      <rect
-        v-else
-        :width="frameWidth"
-        :height="frameHeight"
-        fill="#000"
-        fill-opacity="0.15"
-      />
-      <g v-if="!showImage">
-        <line :x1="frameWidth / 3" y1="0" :x2="frameWidth / 3" :y2="frameHeight" stroke="#1f2937" stroke-width="1" />
-        <line :x1="(frameWidth / 3) * 2" y1="0" :x2="(frameWidth / 3) * 2" :y2="frameHeight" stroke="#1f2937" stroke-width="1" />
-        <line x1="0" :y1="frameHeight / 3" :x2="frameWidth" :y2="frameHeight / 3" stroke="#1f2937" stroke-width="1" />
-        <line x1="0" :y1="(frameHeight / 3) * 2" :x2="frameWidth" :y2="(frameHeight / 3) * 2" stroke="#1f2937" stroke-width="1" />
-      </g>
-
-      <template v-if="hasBox">
-        <rect
-          :x="box.x"
-          :y="box.y"
-          :width="box.w"
-          :height="box.h"
-          fill="none"
-          :stroke="color"
-          :stroke-width="strokeWidth"
-        />
-        <rect
-          :x="box.x"
-          :y="box.y"
-          :width="box.w"
-          :height="box.h"
-          :fill="color"
-          fill-opacity="0.12"
-        />
-        <g>
-          <rect
-            :x="box.x"
-            :y="Math.max(0, box.y - labelHeight)"
-            :width="labelWidth"
-            :height="labelHeight"
-            :fill="color"
-          />
-          <text
-            :x="box.x + labelHeight * 0.35"
-            :y="Math.max(0, box.y - labelHeight) + labelHeight * 0.72"
-            :font-size="labelHeight * 0.6"
-            font-family="monospace"
-            font-weight="700"
-            fill="#0b0f14"
-          >{{ label }}</text>
-        </g>
-      </template>
-
-      <text
-        v-else
-        :x="frameWidth / 2"
-        :y="frameHeight / 2"
-        text-anchor="middle"
-        :font-size="frameHeight * 0.06"
-        fill="#4b5563"
-        font-family="monospace"
-      >no box</text>
-    </svg>
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import {
+  normalizeBoundBox,
+  PIPELINE_FRAME_HEIGHT,
+  PIPELINE_FRAME_WIDTH,
+} from '~/composables/useBoundBox'
+
 const props = withDefaults(defineProps<{
   boundBox: [number, number, number, number] | number[] | null | undefined
   color?: string
   label?: string
   src?: string | null
-  frameWidth?: number
-  frameHeight?: number
 }>(), {
   color: '#fb923c',
   label: 'BOX',
   src: null,
-  frameWidth: 1920,
-  frameHeight: 1080,
 })
 
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const bgImage = shallowRef<HTMLImageElement | null>(null)
 const imgError = ref(false)
-const showImage = computed(() => !!props.src && !imgError.value)
 
-watch(() => props.src, () => { imgError.value = false })
+/** Bboxes from the API are always in pipeline pixel space (640×480). */
+const box = computed(() => normalizeBoundBox(props.boundBox))
 
-const strokeWidth = computed(() => Math.max(2, props.frameWidth * 0.004))
-const labelHeight = computed(() => Math.max(18, props.frameHeight * 0.05))
-const labelWidth = computed(() => labelHeight.value * 0.62 * (props.label.length + 1))
+function loadImage(url: string | null | undefined) {
+  bgImage.value = null
+  imgError.value = false
+  if (!url || !import.meta.client) {
+    nextTick(() => draw())
+    return
+  }
+  const im = new Image()
+  im.onload = () => {
+    bgImage.value = im
+    nextTick(() => draw())
+  }
+  im.onerror = () => {
+    imgError.value = true
+    nextTick(() => draw())
+  }
+  im.src = url
+}
 
-const hasBox = computed(() => {
-  const b = props.boundBox
-  if (!b || b.length < 4) return false
+watch(() => props.src, (url) => loadImage(url), { immediate: true })
+watch(
+  () => [props.boundBox, props.color, props.label, bgImage.value, imgError.value],
+  () => nextTick(() => draw()),
+  { deep: true },
+)
+
+function drawGrid(ctx: CanvasRenderingContext2D) {
+  const w = PIPELINE_FRAME_WIDTH
+  const h = PIPELINE_FRAME_HEIGHT
+  const g = ctx.createLinearGradient(0, 0, w, h)
+  g.addColorStop(0, '#1e293b')
+  g.addColorStop(0.5, '#0f172a')
+  g.addColorStop(1, '#020617')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, w, h)
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.35)'
+  ctx.lineWidth = 1
+  for (let x = 0; x < w; x += w / 3) {
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, h)
+    ctx.stroke()
+  }
+  for (let y = 0; y < h; y += h / 3) {
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(w, y)
+    ctx.stroke()
+  }
+}
+
+function draw() {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const w = PIPELINE_FRAME_WIDTH
+  const h = PIPELINE_FRAME_HEIGHT
+  ctx.clearRect(0, 0, w, h)
+
+  const im = bgImage.value
+  if (im && im.complete && im.naturalWidth > 0 && !imgError.value) {
+    // Scale frame into pipeline coordinates — same space as bound_box from backend.
+    ctx.drawImage(im, 0, 0, w, h)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'
+    ctx.fillRect(0, 0, w, h)
+  }
+  else {
+    drawGrid(ctx)
+  }
+
+  const b = box.value
+  if (!b) {
+    if (!im || imgError.value) {
+      ctx.fillStyle = '#4b5563'
+      ctx.font = `${Math.max(12, h * 0.06)}px monospace`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('no box', w / 2, h / 2)
+    }
+    return
+  }
+
   const [x1, y1, x2, y2] = b
-  return Number.isFinite(x1) && Number.isFinite(y1) && Number.isFinite(x2) && Number.isFinite(y2)
-    && (x2 - x1) > 0 && (y2 - y1) > 0
-})
+  const bw = x2 - x1
+  const bh = y2 - y1
+  const stroke = Math.max(2, w * 0.004)
+  const labelH = Math.max(14, h * 0.05)
+  const labelW = labelH * 0.62 * (props.label.length + 1)
+  const labelY = Math.max(0, y1 - labelH)
 
-const box = computed(() => {
-  const b = props.boundBox ?? [0, 0, 0, 0]
-  const x1 = Math.min(b[0]!, b[2]!)
-  const y1 = Math.min(b[1]!, b[3]!)
-  const x2 = Math.max(b[0]!, b[2]!)
-  const y2 = Math.max(b[1]!, b[3]!)
-  const cx1 = Math.max(0, Math.min(x1, props.frameWidth))
-  const cy1 = Math.max(0, Math.min(y1, props.frameHeight))
-  const cx2 = Math.max(0, Math.min(x2, props.frameWidth))
-  const cy2 = Math.max(0, Math.min(y2, props.frameHeight))
-  return { x: cx1, y: cy1, w: cx2 - cx1, h: cy2 - cy1 }
-})
+  ctx.globalAlpha = 0.14
+  ctx.fillStyle = props.color
+  ctx.fillRect(x1, y1, bw, bh)
+  ctx.globalAlpha = 1
+
+  ctx.strokeStyle = props.color
+  ctx.lineWidth = stroke
+  ctx.strokeRect(x1, y1, bw, bh)
+
+  ctx.fillStyle = props.color
+  ctx.fillRect(x1, labelY, labelW, labelH)
+  ctx.fillStyle = '#0b0f14'
+  ctx.font = `700 ${labelH * 0.6}px monospace`
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(props.label, x1 + labelH * 0.35, labelY + labelH * 0.55)
+}
+
+onMounted(() => nextTick(() => draw()))
 </script>

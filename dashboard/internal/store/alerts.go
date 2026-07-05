@@ -13,16 +13,21 @@ type AlertStore struct {
 
 type Alerts struct {
 	ID         int64      `json:"id"`
+	AlertId    string     `json:"alert_id"`
 	Camera     string     `json:"camera"`
-	ZoneName   *string     `json:"zone_name"`
-	ZoneID     *int64      `json:"zone_id"`
+	ZoneName   *string    `json:"zone_name"`
+	ZoneID     *int64     `json:"zone_id"`
 	TrackerID  int64      `json:"tracker_id"`
 	BoundBox   [4]float64 `json:"bound_box"`
 	Label      string     `json:"label"`
 	Status     string     `json:"status"`
 	RecordedAt time.Time  `json:"recorded_at"`
 	AlertType  string     `json:"alert_type"`
-	Severity string	`json:"severity"`
+	Severity   string     `json:"severity"`
+}
+
+type AlertFrames struct{
+	FrameUUID string `json:"alert_id"`
 }
 
 func NewAlertStore(db *sql.DB) *AlertStore {
@@ -33,6 +38,7 @@ func (s *AlertStore) GetAll(ctx context.Context, camera, status string) ([]Alert
 
 	query := `SELECT 
     a.id,
+	a.alert_id,
     a.camera,
     a.zone_id,
     z.name AS zone_name,
@@ -77,7 +83,7 @@ func (s *AlertStore) GetAll(ctx context.Context, camera, status string) ([]Alert
 		var a Alerts
 
 		var rowBoundBox []byte
-		if err := rows.Scan(&a.ID, &a.Camera, &a.ZoneID, &a.ZoneName, &a.TrackerID, &rowBoundBox, &a.Label, &a.Status, &a.RecordedAt, &a.AlertType, &a.Severity); err != nil {
+		if err := rows.Scan(&a.ID, &a.AlertId, &a.Camera, &a.ZoneID, &a.ZoneName, &a.TrackerID, &rowBoundBox, &a.Label, &a.Status, &a.RecordedAt, &a.AlertType, &a.Severity); err != nil {
 			return nil, err
 		}
 
@@ -102,7 +108,7 @@ func (s *AlertStore) UpdateStatus(ctx context.Context, id int64, status string) 
     	UPDATE alerts
     	SET status = $2
     	WHERE id = $1
-    	RETURNING id, camera, zone_id, tracker_id, bound_box, label, status, recorded_at, alert_type, severity
+    	RETURNING id, alert_id, camera, zone_id, tracker_id, bound_box, label, status, recorded_at, alert_type, severity
 		)
 		SELECT u.id, u.camera, u.zone_id, z.name AS zone_name,
     		u.tracker_id, u.bound_box, u.label, u.status, u.recorded_at, u.alert_type, u.severity
@@ -116,7 +122,7 @@ func (s *AlertStore) UpdateStatus(ctx context.Context, id int64, status string) 
 	var alert Alerts
 	var rowBoundBox []byte
 
-	err := s.db.QueryRowContext(ctx, query, id, status).Scan(&alert.ID, &alert.Camera, &alert.ZoneID, &alert.ZoneName, &alert.TrackerID, &rowBoundBox, &alert.Label, &alert.Status, &alert.RecordedAt, &alert.AlertType, &alert.Severity)
+	err := s.db.QueryRowContext(ctx, query, id, status).Scan(&alert.ID, &alert.AlertId, &alert.Camera, &alert.ZoneID, &alert.ZoneName, &alert.TrackerID, &rowBoundBox, &alert.Label, &alert.Status, &alert.RecordedAt, &alert.AlertType, &alert.Severity)
 	if err != nil {
 		return nil, err
 	}
@@ -127,3 +133,4 @@ func (s *AlertStore) UpdateStatus(ctx context.Context, id int64, status string) 
 
 	return &alert, nil
 }
+

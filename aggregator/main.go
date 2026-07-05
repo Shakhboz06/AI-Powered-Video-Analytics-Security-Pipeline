@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/segmentio/kafka-go"
 	"log"
 	"os/signal"
 	"strconv"
@@ -12,9 +14,20 @@ import (
 	"video-analytics-pipe/config"
 	"video-analytics-pipe/db/postgres"
 	myredis "video-analytics-pipe/db/redis/cache"
-
-	"github.com/segmentio/kafka-go"
 )
+
+type Alert struct {
+	AlertID    string     `json:"alert_id"`
+	Camera     string     `json:"camera"`
+	ZoneID     *int64     `json:"zone_id"`
+	ZoneName   string     `json:"zone_name,omitempty"`
+	TrackerID  int64      `json:"tracker_id"`
+	BoundBox   [4]float64 `json:"bound_box"`
+	Label      string     `json:"label"`
+	RecordedAt time.Time  `json:"recorded_at"`
+	AlertType  string     `json:"alert_type"`
+	Severity   string     `json:"severity"`
+}
 
 type Detections struct {
 	ClassID   int64      `json:"class_id"`
@@ -43,9 +56,20 @@ type TabDetection struct {
 	RecordedAt      time.Time `json:"recorded_at"`
 }
 
+type AlertNotifications struct {
+	Camera     string     `json:"camera"`
+	AlertID    string     `json:"alert_id"`
+	TrackerID  int64      `json:"tracker_id"`
+	BoundBox   [4]float64 `json:"bound_box"`
+	RecordedAt int64      `json:"timestamp"`
+	AlertType  string     `json:"alert_type"`
+}
+
 var mlFallCooldowns = make(map[string]map[int64]time.Time)
+var mlFallStreaks = make(map[string]map[int64]int)
 
 const mlFallCooldownDuration = 30 * time.Second
+const mlConfirmationFrames = 5
 
 func main() {
 	shutDownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -69,10 +93,19 @@ func main() {
 	specs := []TopicSpec{
 		{"video.analysis", 6, 1},
 		{"video.results", 6, 1},
+		{"video.alert_notifications", 6, 1},
 	}
+
 	if err := KafkaTopics(shutDownCtx, broker, specs); err != nil {
 		log.Fatalf("❌  could not create/verify topics: %v", err)
 	}
+
+	writer := kafka.NewWriter(kafka.WriterConfig{
+		Brokers: []string{broker},
+		Topic:   "video.alert_notifications",
+	})
+
+	defer writer.Close()
 
 	// ─── Kafka reader from video.results ───────────────────
 	reader := kafka.NewReader(kafka.ReaderConfig{
@@ -243,7 +276,6 @@ func main() {
 			alerts = append(alerts, runningAlerts...)
 
 			fallingAlerts := fallingDetector.DetectFall(det.Camera, det.Detections, det.Keypoints, detections.RecordedAt)
-			// alerts = append(alerts, fallingAlerts...)
 
 			ruleBasedTrackers := map[int64]bool{}
 			for _, alert := range fallingAlerts {
@@ -251,17 +283,24 @@ func main() {
 			}
 
 			for trackedIDStr, prob := range det.FallingDetections {
-				if trackedIDStr == "" {
-					continue
-				}
 
-				if prob < 0.7 {
+				if trackedIDStr == "" {
 					continue
 				}
 
 				trackedID, err := strconv.ParseInt(trackedIDStr, 10, 64)
 				if err != nil {
 					log.Printf("failed to parse trackedID: %v", err)
+					continue
+				}
+
+				over := prob >= 0.7
+
+				log.Printf("falling probability: %v", prob)
+
+				streak := mlRecordFallStreak(det.Camera, trackedID, over)
+
+				if streak < mlConfirmationFrames {
 					continue
 				}
 
@@ -300,14 +339,13 @@ func main() {
 				})
 
 				updateMLCooldown(det.Camera, trackedID, detections.RecordedAt)
-
 			}
 
 			abandonedObjAlerts := abandonedObjDetector.DetectAbandonedObj(det.Camera, det.Detections, detections.RecordedAt)
 			alerts = append(alerts, abandonedObjAlerts...)
 
 			fightingAlerts := fightingDetector.DetectFight(det.Camera, det.Detections, det.FightPredictions, detections.RecordedAt)
-			if fightingAlerts != nil{
+			if fightingAlerts != nil {
 				alerts = append(alerts, *fightingAlerts)
 				log.Printf("fighting alert: %v", fightingAlerts)
 			}
@@ -315,15 +353,48 @@ func main() {
 			brandishingAlerts := brandishingDetector.DetectBrandishing(det.Camera, det.Detections, det.Keypoints, detections.RecordedAt)
 			alerts = append(alerts, brandishingAlerts...)
 			if len(alerts) > 0 {
+				for i := range alerts {
+					alerts[i].AlertID = uuid.New().String()
+				}
 				if err := alertStore.Create(ctx, alerts); err != nil {
 					log.Printf("failed to insert alerts: %v", err)
 					continue
+				}
+				
+				for _, a := range alerts{
+	
+					kafkaAlerts := AlertNotifications{
+						Camera: a.Camera,
+						AlertID: a.AlertID,
+						TrackerID: a.TrackerID,
+						RecordedAt: a.RecordedAt.UnixMilli(),
+						BoundBox: a.BoundBox,
+						AlertType: a.AlertType,
+					}
+	
+					jsonData, err := json.Marshal(kafkaAlerts)
+	
+					if err != nil{
+						log.Printf("failed to encode to json: %v", err)
+						continue
+					}
+	
+					err = writer.WriteMessages(shutDownCtx, kafka.Message{
+						Key: []byte(a.AlertID),
+						Value: jsonData,
+					})
+					
+					if err != nil {
+						log.Printf("failed to write the alerts notifications into alerts: %v", err)
+						continue
+					}
 				}
 				publishAlertsToRedis(ctx, rdb, alerts)
 			}
 
 
 			cancel()
+
 
 			log.Printf("Wrote to TimeSeriesDB: %s lat=%.1fms",
 				det.Camera, det.LatencyMS,
@@ -348,4 +419,19 @@ func updateMLCooldown(camera string, trackerID int64, now time.Time) {
 		mlFallCooldowns[camera] = make(map[int64]time.Time)
 	}
 	mlFallCooldowns[camera][trackerID] = now
+}
+
+func mlRecordFallStreak(camera string, trackerID int64, over bool) int {
+	if over {
+		if mlFallStreaks[camera] == nil {
+			mlFallStreaks[camera] = make(map[int64]int)
+		}
+		mlFallStreaks[camera][trackerID]++
+	} else {
+		if mlFallStreaks[camera] != nil {
+			mlFallStreaks[camera][trackerID] = 0
+		}
+	}
+
+	return mlFallStreaks[camera][trackerID]
 }

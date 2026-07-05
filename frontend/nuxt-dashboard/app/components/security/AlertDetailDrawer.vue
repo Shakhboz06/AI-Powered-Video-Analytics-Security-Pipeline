@@ -37,9 +37,15 @@
             <span v-if="alert.severity" class="app-chip" :class="severityChipClass">{{ alert.severity }} severity</span>
           </div>
 
-          <div v-if="hasBox">
-            <p class="app-section-title mb-2">Location</p>
-            <BoundingBoxPreview :bound-box="alert.bound_box" :color="meta.boxColor" :label="boxLabel" :src="cameraImageUrl(alert.camera)" />
+          <div v-if="hasBox || alert.alert_id">
+            <p class="app-section-title mb-2">{{ alert.alert_id ? 'Captured frame' : 'Location' }}</p>
+            <AlertFramePreview
+              :alert-id="alert.alert_id"
+              :camera="alert.camera"
+              :bound-box="alert.bound_box"
+              :color="meta.boxColor"
+              :label="boxLabel"
+            />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -95,9 +101,10 @@
 </template>
 
 <script setup lang="ts">
-import BoundingBoxPreview from '~/components/security/BoundingBoxPreview.vue'
+import AlertFramePreview from '~/components/security/AlertFramePreview.vue'
 import { formatRelativeAgo } from '~/composables/useRelativeTime'
 import { getAlertMeta, normalizeAlertType } from '~/composables/useAlertMeta'
+import { hasValidBoundBox } from '~/composables/useBoundBox'
 import type { SecurityAlert } from '~/types/security'
 
 const props = defineProps<{
@@ -117,10 +124,7 @@ const canUpdate = computed(() => !!props.alert && props.alert.id > 0)
 const isSceneLevel = computed(() => meta.value.sceneLevel === true || props.alert?.tracker_id === 0)
 const objectLabel = computed(() => props.alert?.label === 'person_group' ? 'Group of people' : (props.alert?.label ?? '—'))
 
-const hasBox = computed(() => {
-  const b = props.alert?.bound_box
-  return !!b && b.length >= 4 && (b[2] - b[0]) > 0 && (b[3] - b[1]) > 0
-})
+const hasBox = computed(() => hasValidBoundBox(props.alert?.bound_box))
 
 const boxLabel = computed(() => {
   const key = normalizeAlertType(props.alert?.alert_type)

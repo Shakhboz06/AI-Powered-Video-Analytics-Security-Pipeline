@@ -34,7 +34,7 @@ const (
 	ratioThresholdStanding float64       = 0.5
 	ratioThresholdFallen   float64       = 0.8
 	keypointConfThreshold  float64       = 0.3
-	confirmationFrames     int64         = 5
+	confirmationFrames     int64        = 5
 	yVarianceThreshold     float64       = 50
 	cooldownSeconds        time.Duration = 30 * time.Second
 	historyLookbackFrames  int64         = 10
@@ -213,9 +213,12 @@ func checkFalling(camera string, st *PerPersonFallState, bbox [4]float64, kyp Ke
 }
 
 func extractHeadY(kyp Keypoints) (float64, bool) {
-	if len(kyp.Points.Conf) > 0 &&
-		len(kyp.Points.XY) > 0 &&
-		float64(kyp.Points.Conf[0]) > keypointConfThreshold {
+
+	if len(kyp.Points.XY) < 7 {
+		return 0, false
+	}
+
+	if len(kyp.Points.Conf) > 0 && len(kyp.Points.XY) > 0 && float64(kyp.Points.Conf[0]) > keypointConfThreshold {
 		return kyp.Points.XY[0][1], true
 	}
 
@@ -281,3 +284,5 @@ func (d *FallDetector) cleanupOldStates(now time.Time, maxAge time.Duration) {
 		}
 	}
 }
+
+

@@ -23,7 +23,7 @@ func (s *AlertStore) Create(ctx context.Context, alerts []Alert) error {
 		return nil
 	}
 	query := `
-		INSERT INTO alerts (camera, zone_id, tracker_id, bound_box, label, recorded_at, alert_type, severity)
+		INSERT INTO alerts (alert_id, camera, zone_id, tracker_id, bound_box, label, recorded_at, alert_type, severity)
 		VALUES 
 	`
 	args := []interface{}{}
@@ -35,8 +35,8 @@ func (s *AlertStore) Create(ctx context.Context, alerts []Alert) error {
 	for i, a := range alerts {
 		base := i * 8
 
-		values = append(values, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
+		values = append(values, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9,
 		))
 
 		jsonBoundBox, err := json.Marshal(a.BoundBox)
@@ -44,7 +44,7 @@ func (s *AlertStore) Create(ctx context.Context, alerts []Alert) error {
 			return err
 		}
 
-		args = append(args, a.Camera, a.ZoneID, a.TrackerID, jsonBoundBox, a.Label, a.RecordedAt, a.AlertType, a.Severity)
+		args = append(args, a.AlertID, a.Camera, a.ZoneID, a.TrackerID, jsonBoundBox, a.Label, a.RecordedAt, a.AlertType, a.Severity)
 	}
 
 	query += strings.Join(values, ",")

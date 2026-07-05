@@ -18,7 +18,7 @@ services:
 
   ## Kafka
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
     environment:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181

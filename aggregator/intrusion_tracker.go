@@ -20,18 +20,6 @@ func NewZoneTrackerState() *ZoneTrackerState {
 	}
 }
 
-type Alert struct {
-	Camera     string     `json:"camera"`
-	ZoneID     *int64     `json:"zone_id"`
-	ZoneName   string     `json:"zone_name,omitempty"`
-	TrackerID  int64      `json:"tracker_id"`
-	BoundBox   [4]float64 `json:"bound_box"`
-	Label      string     `json:"label"`
-	RecordedAt time.Time  `json:"recorded_at"`
-	AlertType  string     `json:"alert_type"`
-	Severity   string     `json:"severity"`
-}
-
 const (
 	GRACE_PERIOD       = 5
 	AlertTypeIntrusion = "intrusion"

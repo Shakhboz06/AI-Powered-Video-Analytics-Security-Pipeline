@@ -257,6 +257,12 @@ export function useApi() {
     })
   }
 
+  async function getAlertImage(alertId: string) {
+    const id = alertId.trim()
+    // Same-origin proxy (server adds X-API-Key) — mirrors /api/alerts/stream
+    return await $fetch<{ signed_url: string }>(`/api/alerts/${encodeURIComponent(id)}/image`)
+  }
+
   function alertStreamUrl() {
     return '/api/alerts/stream'
   }
@@ -282,6 +288,7 @@ export function useApi() {
     deleteZone,
     listAlerts,
     patchAlertStatus,
+    getAlertImage,
     alertStreamUrl,
   }
 }

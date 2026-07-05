@@ -5,3 +5,4 @@ confluent-kafka
 ultralytics
 supervision
 pytorchvideo
+supabase

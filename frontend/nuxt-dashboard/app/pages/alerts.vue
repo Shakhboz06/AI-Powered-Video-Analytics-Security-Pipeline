@@ -426,6 +426,9 @@ async function loadInitialAlerts() {
 
 type StreamAlertPayload = Partial<SecurityAlert> & {
   id?: number
+  alert_id?: string
+  AlertId?: string
+  alertId?: string
   zone_id?: number | null
   ZoneID?: number | null
   tracker_id?: number
@@ -453,6 +456,7 @@ function normalizeStreamAlert(raw: StreamAlertPayload): SecurityAlert {
 
   return {
     id,
+    alert_id: raw.alert_id ?? raw.AlertId ?? raw.alertId ?? null,
     camera: raw.camera ?? raw.Camera ?? 'unknown',
     zone_name: raw.zone_name ?? '',
     zone_id: zoneId,
