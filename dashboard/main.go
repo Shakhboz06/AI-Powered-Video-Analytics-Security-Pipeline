@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 
 	"log"
 	"net"
@@ -21,8 +22,31 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/segmentio/kafka-go"
 	"golang.org/x/sync/errgroup"
 )
+
+const uploadsTopic = "video.uploads"
+
+// ensureUploadsTopic creates the upload-jobs topic if it does not exist yet;
+// auto topic creation is disabled on the broker.
+func ensureUploadsTopic(broker string) {
+	conn, err := kafka.Dial("tcp", broker)
+	if err != nil {
+		log.Printf("⚠️  could not dial kafka to ensure %s topic: %v", uploadsTopic, err)
+		return
+	}
+	defer conn.Close()
+
+	err = conn.CreateTopics(kafka.TopicConfig{
+		Topic:             uploadsTopic,
+		NumPartitions:     1,
+		ReplicationFactor: 1,
+	})
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		log.Printf("⚠️  could not create %s topic: %v", uploadsTopic, err)
+	}
+}
 
 func main() {
 
@@ -104,6 +128,33 @@ func main() {
 	apis.GET("cameras", api.GetCameraList(cameraStore))
 	apis.PUT("cameras/:id", api.UpdateCamera(cameraStore))
 	apis.DELETE("cameras/:id", api.DeleteCamera(cameraStore))
+
+	// ─── Public video analysis (anonymous upload + shareable results) ──
+	kafkaBroker := config.GetString("KAFKA_BROKER", "")
+	ensureUploadsTopic(kafkaBroker)
+
+	uploadsWriter := kafka.NewWriter(kafka.WriterConfig{
+		Brokers: []string{kafkaBroker},
+		Topic:   uploadsTopic,
+	})
+	defer uploadsWriter.Close()
+
+	uploadDir := config.GetString("UPLOAD_DIR", "/uploads")
+	uploadRateLimit := config.GetInt("UPLOAD_RATE_LIMIT", 10)
+
+	jobStore := store.NewJobStore(database)
+
+	public := r.Group("/api/v1/public")
+	public.POST("/uploads",
+		middleware.RateLimitByIP(uploadRateLimit, time.Hour),
+		api.CreateUpload(jobStore, uploadsWriter, uploadDir),
+	)
+	public.GET("/uploads/:job_id", api.GetUploadJob(jobStore, alertStore))
+	public.GET("/uploads/:job_id/alerts/:alert_id/image", api.GetUploadAlertImage(jobStore, alertStore))
+
+	// callback used by the upload ingestor to report progress
+	internal := r.Group("/api/v1/internal", auth)
+	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
 	// ─── Start server ──────────────────────────────
 
 	r.GET("/healthz", func(c *gin.Context) {
@@ -115,7 +166,7 @@ func main() {
 
 		type ServiceCheck struct {
 			Service string `json:"service"`
-			Status  string `json:status`
+			Status  string `json:"status"`
 			Err     string `json:"error,omitempty"`
 		}
 
