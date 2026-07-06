@@ -100,6 +100,21 @@ services:
       kafka:
         condition: service_healthy
 
+  ## ────────────────────────────────────
+  ## Upload Ingestor — consumes self-serve
+  ## upload jobs alongside the live ingestor
+  ## ────────────────────────────────────
+  upload-ingestor:
+    build:
+      context: ./ingestor
+      dockerfile: ingestor.dockerfile
+    container_name: upload-ingestor
+    entrypoint: ["python", "-u", "upload_ingestor.py"]
+    env_file:
+      - .env
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   dashboard:
     build:

@@ -130,3 +130,14 @@ export interface SecurityAlert {
   severity?: string | null
   recorded_at: string
 }
+
+/** Self-serve upload job lifecycle (upload_jobs table). */
+export type UploadJobStatus = 'queued' | 'processing' | 'done' | 'failed'
+
+export interface UploadJob {
+  job_id: string
+  filename: string
+  status: UploadJobStatus
+  created_at: string
+  completed_at?: string | null
+}

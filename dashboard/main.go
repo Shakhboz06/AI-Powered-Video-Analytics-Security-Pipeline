@@ -21,6 +21,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/segmentio/kafka-go"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -104,6 +105,24 @@ func main() {
 	apis.GET("cameras", api.GetCameraList(cameraStore))
 	apis.PUT("cameras/:id", api.UpdateCamera(cameraStore))
 	apis.DELETE("cameras/:id", api.DeleteCamera(cameraStore))
+
+	// ─── Self-serve video uploads ──────────────────
+	uploadsWriter := kafka.NewWriter(kafka.WriterConfig{
+		Brokers: []string{config.GetString("KAFKA_BROKER", "")},
+		Topic:   "video.upload_jobs",
+	})
+	defer uploadsWriter.Close()
+
+	uploadStore := store.NewUploadStore(database)
+
+	// deliberately public so strangers can analyze a clip — hence the size cap + rate limit
+	r.POST("/api/uploads",
+		middleware.RateLimitByIP(config.GetInt("UPLOAD_RATE_LIMIT", 10), time.Hour),
+		api.CreateUpload(uploadStore, uploadsWriter),
+	)
+	r.GET("/api/uploads/:job_id", api.GetUpload(uploadStore))
+	// internal write path used by the upload ingestor
+	r.PATCH("/api/uploads/:job_id/status", auth, api.UpdateUploadStatus(uploadStore))
 	// ─── Start server ──────────────────────────────
 
 	r.GET("/healthz", func(c *gin.Context) {

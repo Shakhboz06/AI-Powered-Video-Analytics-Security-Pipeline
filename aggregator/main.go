@@ -94,6 +94,7 @@ func main() {
 		{"video.analysis", 6, 1},
 		{"video.results", 6, 1},
 		{"video.alert_notifications", 6, 1},
+		{"video.upload_jobs", 6, 1},
 	}
 
 	if err := KafkaTopics(shutDownCtx, broker, specs); err != nil {
