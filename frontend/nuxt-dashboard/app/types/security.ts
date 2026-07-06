@@ -131,13 +131,23 @@ export interface SecurityAlert {
   recorded_at: string
 }
 
-/** Self-serve upload job lifecycle (upload_jobs table). */
-export type UploadJobStatus = 'queued' | 'processing' | 'done' | 'failed'
+/** Public video-analysis job created by an anonymous upload. */
+export type AnalysisJobStatus = 'queued' | 'processing' | 'finalizing' | 'done' | 'failed'
 
-export interface UploadJob {
+export interface AnalysisJob {
   job_id: string
-  filename: string
-  status: UploadJobStatus
+  stream_id: string
+  original_filename: string
+  status: AnalysisJobStatus
+  progress: number
+  error?: string | null
+  started_at?: string | null
+  last_frame_at?: string | null
   created_at: string
-  completed_at?: string | null
+  updated_at: string
+}
+
+export interface UploadJobResponse {
+  job: AnalysisJob
+  alerts: SecurityAlert[]
 }

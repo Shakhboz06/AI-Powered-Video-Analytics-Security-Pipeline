@@ -23,7 +23,7 @@
         </h1>
         <p class="mx-auto mt-3 max-w-xl text-gray-400">
           Upload a clip and our detection pipeline will scan it for falls, fights, weapons,
-          running and abandoned objects. Results live on a link you can share.
+          running and abandoned objects. You'll get a shareable link with the results.
         </p>
       </div>
 
@@ -42,7 +42,7 @@
             ref="fileInput"
             type="file"
             class="hidden"
-            accept=".mp4,.avi,.mov"
+            :accept="ACCEPT"
             @change="onPick"
           >
           <div class="pointer-events-none">
@@ -59,7 +59,7 @@
                 {{ prettySize(selectedFile.size) }} — click to choose a different file
               </template>
               <template v-else>
-                or click to browse · MP4, AVI, MOV · up to {{ MAX_MB }} MB
+                or click to browse · MP4, MOV, AVI, MKV, WebM · up to {{ MAX_MB }} MB
               </template>
             </p>
           </div>
@@ -83,7 +83,7 @@
 
         <div class="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
           <p class="text-xs text-gray-500">
-            Uploaded videos are deleted after analysis; detected events and evidence frames are retained.
+            Only the first {{ MAX_ANALYZED_SECONDS }}s are analyzed. Results stay available via a private link.
           </p>
           <button
             class="btn-primary w-full px-6 py-3 text-base sm:w-auto"
@@ -116,8 +116,12 @@ definePageMeta({ layout: false })
 
 useHead({ title: 'Analyze a video — Security Ops' })
 
-const ALLOWED_EXTS = ['mp4', 'avi', 'mov']
+const ACCEPT = '.mp4,.mov,.avi,.mkv,.webm,video/*'
+const ALLOWED_EXTS = ['mp4', 'mov', 'avi', 'mkv', 'webm']
 const MAX_MB = 200
+const MAX_ANALYZED_SECONDS = 180
+
+const api = useApi()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
@@ -135,7 +139,7 @@ const steps = [
 function validate(file: File): string {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
   if (!ALLOWED_EXTS.includes(ext))
-    return `Unsupported file type ".${ext}" — use MP4, AVI or MOV.`
+    return `Unsupported file type ".${ext}" — use MP4, MOV, AVI, MKV or WebM.`
   if (file.size > MAX_MB * 1024 * 1024)
     return `File is ${prettySize(file.size)}, the limit is ${MAX_MB} MB.`
   return ''
@@ -162,36 +166,6 @@ function onDrop(e: DragEvent) {
   setFile(e.dataTransfer?.files?.[0])
 }
 
-/** POSTs to the same-origin Nuxt proxy (host-agnostic) with upload progress via XHR. */
-function uploadVideo(file: File, onProgress: (percent: number) => void) {
-  return new Promise<{ job_id: string }>((resolve, reject) => {
-    const form = new FormData()
-    form.append('video', file)
-
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/uploads')
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable)
-        onProgress(Math.round((e.loaded / e.total) * 100))
-    }
-    xhr.onload = () => {
-      try {
-        const body = JSON.parse(xhr.responseText || '{}')
-        if (xhr.status >= 200 && xhr.status < 300 && body.job_id)
-          resolve(body)
-        else
-          reject(new Error(body.error || `upload failed (${xhr.status})`))
-      }
-      catch {
-        reject(new Error(`upload failed (${xhr.status})`))
-      }
-    }
-    xhr.onerror = () => reject(new Error('network error during upload'))
-    xhr.send(form)
-  })
-}
-
 async function startUpload() {
   if (!selectedFile.value || uploading.value) return
   errorMsg.value = ''
@@ -199,8 +173,8 @@ async function startUpload() {
   uploadPercent.value = 0
 
   try {
-    const { job_id } = await uploadVideo(selectedFile.value, (p) => { uploadPercent.value = p })
-    await navigateTo(`/uploads/${job_id}`)
+    const job = await api.uploadVideo(selectedFile.value, (p) => { uploadPercent.value = p })
+    await navigateTo(`/results/${job.job_id}`)
   }
   catch (err) {
     errorMsg.value = err instanceof Error ? err.message : 'Upload failed, please try again.'

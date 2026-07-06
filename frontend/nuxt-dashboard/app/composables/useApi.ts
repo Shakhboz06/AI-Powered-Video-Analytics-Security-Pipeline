@@ -12,6 +12,7 @@ import type {
   SecurityAlert,
   SecurityZone,
   SummaryResponse,
+  UploadJobResponse,
   ZoneListResponse,
 } from '~/types/security'
 import type { AuthUser } from '~/types/security'
@@ -267,6 +268,48 @@ export function useApi() {
     return '/api/alerts/stream'
   }
 
+  // ── Public video analysis (no auth / API key required) ─────────────
+
+  /** Uploads a video for anonymous analysis, reporting upload progress via `onProgress` (0–100). */
+  function uploadVideo(file: File, onProgress?: (percent: number) => void) {
+    return new Promise<UploadJobResponse['job']>((resolve, reject) => {
+      const form = new FormData()
+      form.append('video', file)
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${base()}/api/v1/public/uploads`)
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress)
+          onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () => {
+        try {
+          const body = JSON.parse(xhr.responseText || '{}')
+          if (xhr.status >= 200 && xhr.status < 300 && body.job)
+            resolve(body.job)
+          else
+            reject(new Error(body.error || `upload failed (${xhr.status})`))
+        }
+        catch {
+          reject(new Error(`upload failed (${xhr.status})`))
+        }
+      }
+      xhr.onerror = () => reject(new Error('network error during upload'))
+      xhr.send(form)
+    })
+  }
+
+  async function getUploadJob(jobId: string) {
+    return await $fetch<UploadJobResponse>(`${base()}/api/v1/public/uploads/${encodeURIComponent(jobId)}`)
+  }
+
+  async function getUploadAlertImage(jobId: string, alertId: string) {
+    return await $fetch<{ signed_url: string }>(
+      `${base()}/api/v1/public/uploads/${encodeURIComponent(jobId)}/alerts/${encodeURIComponent(alertId)}/image`,
+    )
+  }
+
   return {
     register,
     login,
@@ -290,5 +333,8 @@ export function useApi() {
     patchAlertStatus,
     getAlertImage,
     alertStreamUrl,
+    uploadVideo,
+    getUploadJob,
+    getUploadAlertImage,
   }
 }

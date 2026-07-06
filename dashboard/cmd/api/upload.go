@@ -1,13 +1,13 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,151 +20,25 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-// UploadJobMessage is published on video.upload_jobs for the upload ingestor.
+var allowedVideoExts = map[string]bool{
+	".mp4":  true,
+	".mov":  true,
+	".avi":  true,
+	".mkv":  true,
+	".webm": true,
+}
+
+// UploadJobMessage is what the upload ingestor consumes from Kafka.
 type UploadJobMessage struct {
-	JobID    string `json:"job_id"`
-	VideoURL string `json:"video_url"`
+	JobID            string `json:"job_id"`
+	StreamID         string `json:"stream_id"`
+	Path             string `json:"path"`
+	OriginalFilename string `json:"original_filename"`
 }
 
-var allowedUploadExts = map[string]bool{
-	".mp4": true,
-	".avi": true,
-	".mov": true,
-}
-
-func uploadsBucket() string {
-	// Separate bucket from evidence frames so retention policies stay
-	// independent (uploads get deleted after processing, evidence never).
-	return config.GetString("SUPABASE_UPLOADS_BUCKET", "uploads")
-}
-
-func uploadObjectPath(jobID string) string {
-	return fmt.Sprintf("uploads/%s.mp4", jobID)
-}
-
-// uploadVideoToStorage streams the file body to Supabase storage — the body
-// is passed as a reader so large files are never held in memory.
-func uploadVideoToStorage(ctx context.Context, objectPath string, body io.Reader) error {
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		fmt.Sprintf("%v/storage/v1/object/%v/%v", config.GetString("SUPABASE_URL", ""), uploadsBucket(), objectPath),
-		body,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create storage request: %w", err)
-	}
-
-	supabaseKey := config.GetString("SUPABASE_KEY", "")
-	req.Header.Set("Authorization", "Bearer "+supabaseKey)
-	req.Header.Set("apikey", supabaseKey)
-	req.Header.Set("Content-Type", "video/mp4")
-
-	// Big files over residential upload are slow — much longer than the sign call.
-	client := &http.Client{Timeout: 120 * time.Second}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to upload to storage: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("storage upload returned %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	return nil
-}
-
-// signUploadURL mints a signed URL for the uploaded video, long enough to
-// cover processing (~1 hour). Same REST pattern as the alert-frame sign call.
-func signUploadURL(ctx context.Context, objectPath string) (string, error) {
-
-	payload, err := json.Marshal(gin.H{"expiresIn": 3600})
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal sign request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		fmt.Sprintf("%v/storage/v1/object/sign/%v/%v", config.GetString("SUPABASE_URL", ""), uploadsBucket(), objectPath),
-		bytes.NewBuffer(payload),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to create sign request: %w", err)
-	}
-
-	supabaseKey := config.GetString("SUPABASE_KEY", "")
-	req.Header.Set("Authorization", "Bearer "+supabaseKey)
-	req.Header.Set("apikey", supabaseKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to call sign endpoint: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("sign endpoint returned %d", resp.StatusCode)
-	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read sign response: %w", err)
-	}
-
-	var signed struct {
-		SignedUrl string `json:"signedURL"`
-	}
-	if err := json.Unmarshal(respBody, &signed); err != nil {
-		return "", fmt.Errorf("failed to parse sign response: %w", err)
-	}
-
-	return fmt.Sprintf("%v/storage/v1%v", config.GetString("SUPABASE_URL", ""), signed.SignedUrl), nil
-}
-
-// deleteUploadObject removes the source video after processing — evidence
-// frames and alerts persist, the footage itself doesn't (storage limitation).
-func deleteUploadObject(ctx context.Context, objectPath string) error {
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodDelete,
-		fmt.Sprintf("%v/storage/v1/object/%v/%v", config.GetString("SUPABASE_URL", ""), uploadsBucket(), objectPath),
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create delete request: %w", err)
-	}
-
-	supabaseKey := config.GetString("SUPABASE_KEY", "")
-	req.Header.Set("Authorization", "Bearer "+supabaseKey)
-	req.Header.Set("apikey", supabaseKey)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to call delete endpoint: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("delete endpoint returned %d", resp.StatusCode)
-	}
-
-	return nil
-}
-
-// CreateUpload handles POST /api/uploads: validates the video, stores it in
-// Supabase, records the job and enqueues it on video.upload_jobs.
-func CreateUpload(uploads *store.UploadStore, writer *kafka.Writer) gin.HandlerFunc {
+// CreateUpload accepts an anonymous video upload, persists it to the shared
+// upload volume and enqueues an analysis job for the ingestor.
+func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
 		maxBytes := int64(config.GetInt("UPLOAD_MAX_BYTES", 200*1024*1024))
@@ -178,130 +52,218 @@ func CreateUpload(uploads *store.UploadStore, writer *kafka.Writer) gin.HandlerF
 		defer file.Close()
 
 		ext := strings.ToLower(filepath.Ext(header.Filename))
-		if !allowedUploadExts[ext] {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "unsupported file type, expected mp4, avi or mov"})
-			return
-		}
-
-		if header.Size > maxBytes {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("file exceeds the %d MB limit", maxBytes/(1024*1024))})
+		if !allowedVideoExts[ext] {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "unsupported file type, expected one of: mp4, mov, avi, mkv, webm"})
 			return
 		}
 
 		jobID := uuid.New().String()
-		objectPath := uploadObjectPath(jobID)
+		streamID := "upload-" + jobID
 
-		if err := uploadVideoToStorage(ctx.Request.Context(), objectPath, file); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not store the uploaded video"})
+		if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not prepare upload storage"})
 			return
 		}
 
-		if err := uploads.Create(ctx, jobID, filepath.Base(header.Filename)); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not create upload job"})
-			return
-		}
-
-		videoURL, err := signUploadURL(ctx.Request.Context(), objectPath)
+		dstPath := filepath.Join(uploadDir, jobID+ext)
+		dst, err := os.Create(dstPath)
 		if err != nil {
-			_ = uploads.UpdateStatus(ctx, jobID, "failed")
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not prepare the video for analysis"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not store uploaded file"})
 			return
 		}
 
-		payload, err := json.Marshal(UploadJobMessage{JobID: jobID, VideoURL: videoURL})
+		if _, err := io.Copy(dst, file); err != nil {
+			dst.Close()
+			os.Remove(dstPath)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("upload interrupted or exceeds %d MB", maxBytes/(1024*1024))})
+			return
+		}
+		dst.Close()
+
+		job := &store.AnalysisJob{
+			JobID:            jobID,
+			StreamID:         streamID,
+			OriginalFilename: filepath.Base(header.Filename),
+			Status:           "queued",
+		}
+
+		if err := jobs.Create(ctx, job); err != nil {
+			os.Remove(dstPath)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not create analysis job"})
+			return
+		}
+
+		msg := UploadJobMessage{
+			JobID:            jobID,
+			StreamID:         streamID,
+			Path:             dstPath,
+			OriginalFilename: job.OriginalFilename,
+		}
+
+		payload, err := json.Marshal(msg)
 		if err != nil {
-			_ = uploads.UpdateStatus(ctx, jobID, "failed")
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not encode upload job"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not encode analysis job"})
 			return
 		}
 
 		writeCtx, cancel := context.WithTimeout(ctx.Request.Context(), 10*time.Second)
 		defer cancel()
 
-		// DB row first, then the Kafka message; a failed publish marks the row failed.
 		if err := writer.WriteMessages(writeCtx, kafka.Message{
-			Key:   []byte(jobID),
+			Key:   []byte(streamID),
 			Value: payload,
 		}); err != nil {
-			_ = uploads.UpdateStatus(ctx, jobID, "failed")
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "analysis queue unavailable, try again later"})
+			errMsg := "analysis queue unavailable"
+			_ = jobs.UpdateProgress(ctx, jobID, "failed", 0, &errMsg, nil)
+			ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "analysis queue unavailable, try again later"})
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{"job_id": jobID})
+		ctx.JSON(http.StatusAccepted, gin.H{"job": job})
 	}
 }
 
-// GetUpload handles GET /api/uploads/:job_id — the status endpoint polled by
-// the results page and used by the ingestor's idempotency check.
-func GetUpload(uploads *store.UploadStore) gin.HandlerFunc {
+// GetUploadJob is the public, shareable status + results endpoint. Anyone
+// holding the job UUID can read it.
+func GetUploadJob(jobs *store.JobStore, alerts *store.AlertStore) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
-		jobID := ctx.Param("job_id")
-		if _, err := uuid.Parse(jobID); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid job id"})
+		jobID, ok := parseJobID(ctx)
+		if !ok {
 			return
 		}
 
-		job, err := uploads.Get(ctx, jobID)
+		job, err := jobs.GetByJobID(ctx, jobID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				ctx.JSON(http.StatusNotFound, gin.H{"error": "upload not found"})
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "analysis not found"})
 				return
 			}
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not load upload"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not load analysis"})
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{"job": job})
+		if err := jobs.FinalizeIfComplete(ctx, job); err != nil {
+			// non-fatal: keep reporting "finalizing" and let the next poll retry
+			fmt.Printf("finalize check failed for job %s: %v\n", jobID, err)
+		}
+
+		jobAlerts, err := alerts.GetForStream(ctx, job.StreamID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not load alerts"})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"job":    job,
+			"alerts": jobAlerts,
+		})
 	}
 }
 
-// UpdateUploadStatus handles PATCH /api/uploads/:job_id/status — the internal
-// write path the upload ingestor uses (API-key protected). Terminal states
-// also delete the source video from storage: it served its purpose.
-func UpdateUploadStatus(uploads *store.UploadStore) gin.HandlerFunc {
+// GetUploadAlertImage returns a signed frame URL for an alert, but only if
+// that alert belongs to the requested job — the job UUID acts as the
+// capability token for anonymous viewers.
+func GetUploadAlertImage(jobs *store.JobStore, alerts *store.AlertStore) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
-		jobID := ctx.Param("job_id")
-		if _, err := uuid.Parse(jobID); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid job id"})
+		jobID, ok := parseJobID(ctx)
+		if !ok {
+			return
+		}
+
+		alertID := ctx.Param("alert_id")
+		if _, err := uuid.Parse(alertID); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid alert id"})
+			return
+		}
+
+		job, err := jobs.GetByJobID(ctx, jobID)
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "analysis not found"})
+			return
+		}
+
+		owned, err := alerts.AlertBelongsToStream(ctx, alertID, job.StreamID)
+		if err != nil || !owned {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "alert not found"})
+			return
+		}
+
+		signedURL, err := SignAlertFrameURL(ctx, alertID)
+		if err != nil {
+			if err == ErrFrameNotFound {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "no image found"})
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign image"})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"signed_url": signedURL})
+	}
+}
+
+// UpdateUploadJob is the API-key protected callback the upload ingestor uses
+// to report progress, finalization and failures.
+func UpdateUploadJob(jobs *store.JobStore) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+
+		jobID, ok := parseJobID(ctx)
+		if !ok {
 			return
 		}
 
 		var payload struct {
-			Status string `json:"status"`
+			Status      string  `json:"status"`
+			Progress    int     `json:"progress"`
+			Error       *string `json:"error"`
+			LastFrameMS *int64  `json:"last_frame_ms"`
 		}
+
 		if err := ctx.BindJSON(&payload); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 			return
 		}
 
-		validStatus := map[string]bool{"processing": true, "done": true, "failed": true}
+		validStatus := map[string]bool{"processing": true, "finalizing": true, "failed": true}
 		if !validStatus[payload.Status] {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid status"})
 			return
 		}
 
-		if err := uploads.UpdateStatus(ctx, jobID, payload.Status); err != nil {
-			if err == sql.ErrNoRows {
-				ctx.JSON(http.StatusNotFound, gin.H{"error": "upload not found"})
-				return
-			}
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not update upload"})
-			return
+		if payload.Progress < 0 {
+			payload.Progress = 0
+		}
+		if payload.Progress > 100 {
+			payload.Progress = 100
 		}
 
-		if payload.Status == "done" || payload.Status == "failed" {
-			// Best-effort, own context: the 2s request timeout must not
-			// leave the source video behind.
-			deleteCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			if err := deleteUploadObject(deleteCtx, uploadObjectPath(jobID)); err != nil {
-				fmt.Printf("could not delete uploaded video for job %s: %v\n", jobID, err)
+		var lastFrameAt *time.Time
+		if payload.LastFrameMS != nil {
+			t := time.UnixMilli(*payload.LastFrameMS)
+			lastFrameAt = &t
+		}
+
+		if err := jobs.UpdateProgress(ctx, jobID, payload.Status, payload.Progress, payload.Error, lastFrameAt); err != nil {
+			if err == sql.ErrNoRows {
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "analysis not found"})
+				return
 			}
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not update analysis"})
+			return
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 	}
 }
+
+func parseJobID(ctx *gin.Context) (string, bool) {
+	jobID := ctx.Param("job_id")
+	if _, err := uuid.Parse(jobID); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid job id"})
+		return "", false
+	}
+	return jobID, true
+}
+
