@@ -100,6 +100,23 @@ services:
       kafka:
         condition: service_healthy
 
+  ## ────────────────────────────────────
+  ## Upload Ingestor — streams user-uploaded
+  ## videos into the analysis pipeline
+  ## ────────────────────────────────────
+  upload-ingestor:
+    build:
+      context: ./ingestor
+      dockerfile: ingestor.dockerfile
+    container_name: upload-ingestor
+    entrypoint: ["python", "-u", "upload_consumer.py"]
+    env_file:
+      - .env
+    volumes:
+      - uploads-data:/uploads
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   dashboard:
     build:
@@ -108,8 +125,12 @@ services:
     container_name: dashboard
     env_file:
       - .env
+    volumes:
+      - uploads-data:/uploads
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     ports:
       - "8081:8081"
@@ -151,6 +172,7 @@ services:
       retries: 5
 volumes:
   db-data:
+  uploads-data:
 
 networks:
   default:
