@@ -100,6 +100,20 @@ services:
       kafka:
         condition: service_healthy
 
+  upload-ingestor:
+    build:
+      context: ./ingestor
+      dockerfile: ingestor.dockerfile
+    container_name: upload-ingestor
+    entrypoint: ["python", "-u", "upload_consumer.py"]
+    env_file:
+      - .env
+    volumes:
+      - uploads-data:/uploads
+    depends_on:
+      kafka:
+        condition: service_healthy
+
 
   dashboard:
     build:
@@ -151,7 +165,8 @@ services:
       retries: 5
 volumes:
   db-data:
-
+  uploads-data:
+  
 networks:
   default:
     driver: bridge

@@ -26,7 +26,7 @@ func NewUploadStore(db *sql.DB) *UploadStore {
 func (s *UploadStore) Create(ctx context.Context, jobID, filename string) error {
 
 	query := `
-		INSERT INTO upload_jobs (job_id, filename, status)
+		INSERT INTO uploaded_jobs (job_id, filename, status)
 		VALUES ($1, $2, 'queued');
 	`
 
@@ -40,7 +40,7 @@ func (s *UploadStore) Create(ctx context.Context, jobID, filename string) error 
 func (s *UploadStore) UpdateStatus(ctx context.Context, jobID, status string) error {
 
 	query := `
-		UPDATE upload_jobs
+		UPDATE uploaded_jobs
 		SET status = $2,
 		    completed_at = CASE WHEN $2 IN ('done', 'failed') THEN NOW() ELSE completed_at END
 		WHERE job_id = $1;
@@ -65,7 +65,7 @@ func (s *UploadStore) Get(ctx context.Context, jobID string) (*UploadJob, error)
 
 	query := `
 		SELECT id, job_id, filename, status, created_at, completed_at
-		FROM upload_jobs
+		FROM uploaded_jobs
 		WHERE job_id = $1;
 	`
 
