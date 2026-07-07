@@ -161,8 +161,30 @@ trackers = {}
 keypoint_history = defaultdict(lambda: defaultdict(lambda: deque(maxlen=30)))
 frame_buffers = defaultdict(lambda: deque())
 last_inference_time = defaultdict(int)
-EVIDENCE_WINDOW_MS = 4000 
+EVIDENCE_WINDOW_MS = 4000
 evidence_buffers = defaultdict(lambda: deque())
+
+# ─── Per-stream state sweep ───────────────────────────────────────────────
+# Upload jobs create a stream per job_id; once a job finishes its state
+# would linger forever (same leak as long-gone live cameras). Age-based
+# sweep drops everything for streams silent longer than STATE_TTL_S.
+last_seen = {}
+STATE_TTL_S = 600
+SWEEP_INTERVAL_S = 60
+last_sweep = time.time()
+
+
+def sweep_stale_streams():
+    now = time.time()
+    stale = [sid for sid, seen in last_seen.items() if now - seen > STATE_TTL_S]
+    for sid in stale:
+        last_seen.pop(sid, None)
+        trackers.pop(sid, None)
+        keypoint_history.pop(sid, None)
+        frame_buffers.pop(sid, None)
+        last_inference_time.pop(sid, None)
+        evidence_buffers.pop(sid, None)
+        print(f"🧹 swept per-stream state for idle stream {sid}")
 
 
 
@@ -409,6 +431,8 @@ try:
             if stream_id not in trackers:
                 trackers[stream_id] = sv.ByteTrack()
 
+            last_seen[stream_id] = time.time()
+
             timestamp = int(decode_header(msg.headers(), "timestamp"))
             res = process_frame(job, stream_id, timestamp)
 
@@ -465,6 +489,10 @@ try:
 
 
                 # print(f"alert {data['alert_id']}: requested {data['timestamp']}, matched {result[0]}, diff {abs(result[0]-data['timestamp'])}ms, saved {filename}")
+
+        if time.time() - last_sweep >= SWEEP_INTERVAL_S:
+            sweep_stale_streams()
+            last_sweep = time.time()
 
 except KeyboardInterrupt:
     pass

@@ -122,6 +122,8 @@ services:
     container_name: dashboard
     env_file:
       - .env
+    volumes:
+      - uploads-data:/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -166,7 +168,6 @@ services:
 volumes:
   db-data:
   uploads-data:
-  
 networks:
   default:
     driver: bridge

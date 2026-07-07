@@ -135,6 +135,27 @@ keypoint_history = defaultdict(lambda: defaultdict(lambda: deque(maxlen=30)))
 frame_buffers = defaultdict(lambda: deque())
 last_inference_time = defaultdict(int)
 
+# ─── Per-stream state sweep ───────────────────────────────────────────────
+# Upload jobs create a stream per job_id; once a job finishes its state
+# would linger forever (same leak as long-gone live cameras). Age-based
+# sweep drops everything for streams silent longer than STATE_TTL_S.
+last_seen = {}
+STATE_TTL_S = 600
+SWEEP_INTERVAL_S = 60
+last_sweep = time.time()
+
+
+def sweep_stale_streams():
+    now = time.time()
+    stale = [sid for sid, seen in last_seen.items() if now - seen > STATE_TTL_S]
+    for sid in stale:
+        last_seen.pop(sid, None)
+        trackers.pop(sid, None)
+        keypoint_history.pop(sid, None)
+        frame_buffers.pop(sid, None)
+        last_inference_time.pop(sid, None)
+        print(f"🧹 swept per-stream state for idle stream {sid}")
+
 def process_frame(frame_bytes, stream_id, timestamp):
 
     tracker = trackers[stream_id]
@@ -367,6 +388,8 @@ try:
         if stream_id not in trackers:
             trackers[stream_id] = sv.ByteTrack()
 
+        last_seen[stream_id] = time.time()
+
         timestamp = int(decode_header(msg.headers(), "timestamp"))
         res = process_frame(job, stream_id, timestamp)
 
@@ -386,6 +409,10 @@ try:
                                                                 
         print(f"{output['camera']} → detections={res['detections']} →  keypoints={res['keypoints']} → fall_predictions={res['fall_predictions']} → fight_predictions={res['fight_predictions']} → "
               f"latency={res['latency_ms']:.1f}ms")
+
+        if time.time() - last_sweep >= SWEEP_INTERVAL_S:
+            sweep_stale_streams()
+            last_sweep = time.time()
 
 except KeyboardInterrupt:
     pass
