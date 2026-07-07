@@ -33,7 +33,7 @@ func (s *AlertStore) Create(ctx context.Context, alerts []Alert) error {
 	defer cancel()
 
 	for i, a := range alerts {
-		base := i * 8
+		base := i * 9
 
 		values = append(values, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
 			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9,

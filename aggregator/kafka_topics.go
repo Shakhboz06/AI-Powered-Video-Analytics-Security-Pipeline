@@ -37,7 +37,6 @@ func KafkaTopics(ctx context.Context, broker string, specs []TopicSpec) error {
         }
     }
 
-    // 2) wait for leaders
     for _, s := range specs {
         deadline := time.Now().Add(30 * time.Second)
         for time.Now().Before(deadline) {

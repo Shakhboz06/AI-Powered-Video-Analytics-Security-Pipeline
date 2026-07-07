@@ -130,3 +130,24 @@ export interface SecurityAlert {
   severity?: string | null
   recorded_at: string
 }
+
+/** Public video-analysis job created by an anonymous upload. */
+export type AnalysisJobStatus = 'queued' | 'processing' | 'finalizing' | 'done' | 'failed'
+
+export interface AnalysisJob {
+  job_id: string
+  stream_id: string
+  original_filename: string
+  status: AnalysisJobStatus
+  progress: number
+  error?: string | null
+  started_at?: string | null
+  last_frame_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UploadJobResponse {
+  job: AnalysisJob
+  alerts: SecurityAlert[]
+}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -144,3 +145,63 @@ func GetAlertImage() gin.HandlerFunc {
 
 	}
 }
+
+func SignAlertFrameURL(ctx context.Context, alertID string) (string, error) {
+
+	body, err := json.Marshal(gin.H{
+		"expiresIn": 300,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		fmt.Sprintf("%v/storage/v1/object/sign/Alert%%20Frames/frame/%v.jpg", config.GetString("SUPABASE_URL", ""), alertID),
+		bytes.NewBuffer(body),
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	supabaseKey := config.GetString("SUPABASE_KEY", "")
+	httpReq.Header.Set("apikey", supabaseKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to call downstream service: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", ErrFrameNotFound
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read downstream response: %w", err)
+	}
+
+	var SignedURL struct {
+		SignedUrl string `json:"signedURL"`
+	}
+
+	if err = json.Unmarshal(bodyBytes, &SignedURL); err != nil {
+		return "", fmt.Errorf("failed to parse body: %w", err)
+	}
+
+	return fmt.Sprintf("%v/storage/v1%v", config.GetString("SUPABASE_URL", ""), SignedURL.SignedUrl), nil
+}
+
+var ErrFrameNotFound = fmt.Errorf("no image found")
+
+
+

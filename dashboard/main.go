@@ -21,6 +21,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/segmentio/kafka-go"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -105,6 +106,33 @@ func main() {
 	apis.PUT("cameras/:id", api.UpdateCamera(cameraStore))
 	apis.DELETE("cameras/:id", api.DeleteCamera(cameraStore))
 	// ─── Start server ──────────────────────────────
+
+	kafkaBroker := config.GetString("KAFKA_BROKER", "")
+	ensureUploadsTopic(kafkaBroker)
+	
+	uploadDir := config.GetString("UPLOAD_DIR", "/uploads")
+	uploadRateLimit := config.GetInt("UPLOAD_RATE_LIMIT", 5)
+
+	jobStore := store.NewJobStore(database)
+
+	uploadsWriter := kafka.NewWriter(kafka.WriterConfig{
+		Brokers: []string{kafkaBroker},
+		Topic:   uploadsTopic,
+	})
+	defer uploadsWriter.Close()
+
+
+	public := r.Group("/api/v1/public")
+	public.POST("/uploads",
+		middleware.RateLimitByIP(uploadRateLimit, time.Hour),
+		api.CreateUpload(jobStore, uploadsWriter, uploadDir),
+	)
+	public.GET("/uploads/:job_id", api.GetUploadJob(jobStore, alertStore))
+	public.GET("/uploads/:job_id/alerts/:alert_id/image", api.GetUploadAlertImage(jobStore, alertStore))
+
+	// callback used by the upload ingestor to report progress
+	internal := r.Group("/api/v1/internal", auth)
+	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
 
 	r.GET("/healthz", func(c *gin.Context) {
 

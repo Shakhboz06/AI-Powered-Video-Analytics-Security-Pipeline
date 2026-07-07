@@ -9,6 +9,7 @@
           <a href="#pipeline" class="transition-colors hover:text-gray-100" @click.prevent="smoothScroll('#pipeline')">How it works</a>
           <a href="#capabilities" class="transition-colors hover:text-gray-100" @click.prevent="smoothScroll('#capabilities')">Detection</a>
           <a href="#stats" class="transition-colors hover:text-gray-100" @click.prevent="smoothScroll('#stats')">Platform</a>
+          <NuxtLink to="/upload" class="transition-colors hover:text-gray-100">Analyze a video</NuxtLink>
         </div>
         <div class="flex items-center gap-2.5">
           <template v-if="isAuthenticated">
@@ -38,6 +39,7 @@
           <a href="#pipeline" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click.prevent="smoothScroll('#pipeline'); mobileMenuOpen = false">How it works</a>
           <a href="#capabilities" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click.prevent="smoothScroll('#capabilities'); mobileMenuOpen = false">Detection</a>
           <a href="#stats" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click.prevent="smoothScroll('#stats'); mobileMenuOpen = false">Platform</a>
+          <NuxtLink to="/upload" class="rounded-lg px-4 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5 hover:text-gray-100" @click="mobileMenuOpen = false">Analyze a video</NuxtLink>
           <hr class="my-3 border-white/10" />
           <template v-if="isAuthenticated">
             <NuxtLink to="/dashboard" class="btn-primary w-full text-center" @click="mobileMenuOpen = false">Open Dashboard</NuxtLink>
@@ -70,8 +72,9 @@
               {{ isAuthenticated ? 'Open Dashboard' : 'Start monitoring' }}
               <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
             </NuxtLink>
-            <NuxtLink :to="isAuthenticated ? '/alerts' : '/auth/login'" class="btn-ghost px-5 py-3 text-base">
-              {{ isAuthenticated ? 'View alerts' : 'Sign in' }}
+            <NuxtLink to="/upload" class="btn-ghost px-5 py-3 text-base">
+              Try it — analyze a video
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
             </NuxtLink>
           </div>
           <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500">
