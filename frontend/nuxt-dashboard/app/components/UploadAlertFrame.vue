@@ -30,23 +30,65 @@ const api = useApi()
 const frameUrl = ref<string | null>(null)
 const loading = ref(false)
 
-watch(
-  () => props.alertId,
-  async (id) => {
+// The worker uploads the capture frame to storage *after* the alert row is
+// already queryable, so the first fetch can 404 on a frame that simply
+// isn't there yet. Five attempts with mild backoff cover that race window;
+// anything still missing afterwards is a permanent miss (evicted frame).
+const MAX_ATTEMPTS = 5
+const RETRY_BASE_DELAY_MS = 2000
+
+let attempts = 0
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearRetry() {
+  if (retryTimer) {
+    clearTimeout(retryTimer)
+    retryTimer = null
+  }
+}
+
+async function fetchFrame(id: string) {
+  // loading stays true across the whole retry window — the spinner reads as
+  // "frame's coming". It only drops on the two terminal outcomes: success
+  // or attempts exhausted (which falls through to the placeholder icon).
+  loading.value = true
+  try {
+    const { signed_url } = await api.getUploadAlertImage(props.jobId, id)
+    clearRetry()
+    frameUrl.value = signed_url
+    loading.value = false
+  }
+  catch {
     frameUrl.value = null
-    if (!import.meta.client || !id?.trim()) return
-    loading.value = true
-    try {
-      const { signed_url } = await api.getUploadAlertImage(props.jobId, id.trim())
-      frameUrl.value = signed_url
+    attempts += 1
+    if (attempts < MAX_ATTEMPTS) {
+      retryTimer = setTimeout(() => {
+        retryTimer = null
+        void fetchFrame(id)
+      }, RETRY_BASE_DELAY_MS * attempts)
     }
-    catch {
-      frameUrl.value = null
-    }
-    finally {
+    else {
       loading.value = false
     }
+  }
+}
+
+watch(
+  () => props.alertId,
+  (raw) => {
+    // Reset must also kill any pending retry and zero the counter — an old
+    // alert's scheduled retry must never clobber the new alert's frame.
+    clearRetry()
+    attempts = 0
+    frameUrl.value = null
+    loading.value = false
+    if (!import.meta.client || !raw?.trim()) return
+    void fetchFrame(raw.trim())
   },
   { immediate: true },
 )
+
+// Navigating away mid-retry: drop the pending timer so no fetch fires
+// against a dead component.
+onUnmounted(clearRetry)
 </script>
