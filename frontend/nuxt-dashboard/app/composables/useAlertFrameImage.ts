@@ -11,8 +11,19 @@ export function isAlertFrameId(value: string | null | undefined): value is strin
 }
 
 /**
- * Resolves a signed Supabase URL for an alert capture frame.
- * Falls back to null when `alertId` is missing or the image is unavailable.
+ * The evidence frame is uploaded to storage by the worker *after* the alert
+ * row lands in the DB, so a card rendering right away can 404 on a frame
+ * that simply isn't there yet. Retry with mild backoff across that race
+ * window; anything not there by the last attempt is a permanent miss
+ * (evicted frame) and gets the placeholder.
+ */
+const MAX_ATTEMPTS = 5
+const RETRY_BASE_DELAY_MS = 2000
+
+/**
+ * Resolves a signed Supabase URL for an alert capture frame, self-retrying
+ * while the frame may still be in flight to storage.
+ * Falls back to `unavailable` when `alertId` is missing or attempts run out.
  */
 export function useAlertFrameImage(alertId: MaybeRefOrGetter<string | null | undefined>) {
   const api = useApi()
@@ -20,42 +31,74 @@ export function useAlertFrameImage(alertId: MaybeRefOrGetter<string | null | und
   const loading = ref(false)
   const unavailable = ref(false)
 
-  async function load(id: string) {
+  let attempts = 0
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearRetry() {
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  }
+
+  async function fetchFrame(id: string) {
     const cached = urlCache.get(id)
     if (cached && cached.expiresAt > Date.now()) {
       frameUrl.value = cached.url
       unavailable.value = false
+      loading.value = false
       return
     }
 
+    // loading stays true across the whole retry window — the spinner reads
+    // as "frame's coming", which is exactly what's happening. It only drops
+    // on the two terminal outcomes: success or attempts exhausted.
     loading.value = true
     unavailable.value = false
     try {
       const { signed_url } = await api.getAlertImage(id)
+      clearRetry()
       urlCache.set(id, { url: signed_url, expiresAt: Date.now() + CACHE_TTL_MS })
       frameUrl.value = signed_url
+      loading.value = false
     }
     catch {
       frameUrl.value = null
-      unavailable.value = true
-    }
-    finally {
-      loading.value = false
+      attempts += 1
+      if (attempts < MAX_ATTEMPTS) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null
+          void fetchFrame(id)
+        }, RETRY_BASE_DELAY_MS * attempts)
+      }
+      else {
+        unavailable.value = true
+        loading.value = false
+      }
     }
   }
 
   watch(
     () => toValue(alertId),
     (raw) => {
+      // Reset must also kill any pending retry and zero the counter — an old
+      // alert's scheduled retry must never clobber the new alert's frame.
+      clearRetry()
+      attempts = 0
       frameUrl.value = null
       unavailable.value = false
+      loading.value = false
       if (!import.meta.client) return
       const id = raw?.trim()
       if (!isAlertFrameId(id)) return
-      void load(id)
+      void fetchFrame(id)
     },
     { immediate: true },
   )
+
+  // Component unmounting mid-retry: drop the pending timer so no fetch fires
+  // against a dead scope.
+  onScopeDispose(clearRetry)
 
   return { frameUrl, loading, unavailable }
 }
