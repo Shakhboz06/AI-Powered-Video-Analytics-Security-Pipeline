@@ -76,13 +76,17 @@ func (s *JobStore) UpdateProgress(ctx context.Context, jobID, status string, pro
 
 	query := `
 		UPDATE analysis_jobs
-		SET status = $2,
-		    progress = GREATEST(progress, $3),
-		    error = COALESCE($4, error),
-		    started_at = CASE WHEN started_at IS NULL AND $2 <> 'queued' THEN NOW() ELSE started_at END,
-		    last_frame_at = COALESCE($5, last_frame_at),
-		    updated_at = NOW()
-		WHERE job_id = $1;
+		SET status = $2::VARCHAR(32),
+			progress = GREATEST(progress, $3::SMALLINT),
+			error = COALESCE($4::TEXT, error),
+			started_at = CASE
+				WHEN started_at IS NULL AND $2::VARCHAR(32) <> 'queued'::VARCHAR(32)
+				THEN NOW()
+				ELSE started_at
+			END,
+			last_frame_at = COALESCE($5::TIMESTAMPTZ, last_frame_at),
+			updated_at = NOW()
+		WHERE job_id = $1::UUID;
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

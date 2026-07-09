@@ -1,13 +1,3 @@
-"""Consumes uploaded-video analysis jobs from Kafka and streams their frames
-into the existing video.analysis topic so the standard worker/aggregator
-pipeline runs on them unchanged.
-
-Job messages (produced by the dashboard API on public upload):
-    {"job_id": "...", "stream_id": "upload-...", "path": "/uploads/<id>.mp4"}
-
-Progress is reported back to the dashboard's internal API so anonymous users
-can watch their analysis advance and share the result link.
-"""
 
 import json
 import os

@@ -209,3 +209,73 @@ func (s *AlertStore) UpdateStatus(ctx context.Context, id int64, status string) 
 	return &alert, nil
 }
 
+func (s *AlertStore) GetForStream(ctx context.Context, camera string) ([]Alerts, error) {
+
+	query := `SELECT
+    a.id,
+	a.alert_id,
+    a.camera,
+    a.zone_id,
+    z.name AS zone_name,
+    a.tracker_id,
+    a.bound_box,
+    a.label,
+    a.status,
+    a.recorded_at,
+	a.alert_type,
+	a.severity
+	FROM alerts a
+	LEFT JOIN zones z ON a.zone_id = z.id
+	WHERE a.camera = $1
+	ORDER BY a.recorded_at ASC
+	LIMIT 500;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, query, camera)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	alerts := []Alerts{}
+
+	for rows.Next() {
+
+		var a Alerts
+
+		var rowBoundBox []byte
+		if err := rows.Scan(&a.ID, &a.AlertId, &a.Camera, &a.ZoneID, &a.ZoneName, &a.TrackerID, &rowBoundBox, &a.Label, &a.Status, &a.RecordedAt, &a.AlertType, &a.Severity); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(rowBoundBox, &a.BoundBox); err != nil {
+			return nil, err
+		}
+
+		alerts = append(alerts, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return alerts, nil
+}
+
+
+func (s *AlertStore) AlertBelongsToStream(ctx context.Context, alertID, camera string) (bool, error) {
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM alerts WHERE alert_id = $1 AND camera = $2)`,
+		alertID, camera,
+	).Scan(&exists)
+
+	return exists, err
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ var allowedVideoExts = map[string]bool{
 	".webm": true,
 }
 
-// UploadJobMessage is what the upload ingestor consumes from Kafka.
+
 type UploadJobMessage struct {
 	JobID            string `json:"job_id"`
 	StreamID         string `json:"stream_id"`
@@ -36,8 +37,7 @@ type UploadJobMessage struct {
 	OriginalFilename string `json:"original_filename"`
 }
 
-// CreateUpload accepts an anonymous video upload, persists it to the shared
-// upload volume and enqueues an analysis job for the ingestor.
+
 func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
@@ -46,6 +46,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 
 		file, header, err := ctx.Request.FormFile("video")
 		if err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("missing or oversized 'video' file (max %d MB)", maxBytes/(1024*1024))})
 			return
 		}
@@ -53,6 +54,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 
 		ext := strings.ToLower(filepath.Ext(header.Filename))
 		if !allowedVideoExts[ext] {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "unsupported file type, expected one of: mp4, mov, avi, mkv, webm"})
 			return
 		}
@@ -61,6 +63,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		streamID := "upload-" + jobID
 
 		if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not prepare upload storage"})
 			return
 		}
@@ -68,11 +71,13 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		dstPath := filepath.Join(uploadDir, jobID+ext)
 		dst, err := os.Create(dstPath)
 		if err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not store uploaded file"})
 			return
 		}
 
 		if _, err := io.Copy(dst, file); err != nil {
+			log.Println("upload create error", err)
 			dst.Close()
 			os.Remove(dstPath)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("upload interrupted or exceeds %d MB", maxBytes/(1024*1024))})
@@ -88,6 +93,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		}
 
 		if err := jobs.Create(ctx, job); err != nil {
+			log.Println("upload create error", err)
 			os.Remove(dstPath)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not create analysis job"})
 			return
@@ -102,6 +108,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 
 		payload, err := json.Marshal(msg)
 		if err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not encode analysis job"})
 			return
 		}
@@ -113,6 +120,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 			Key:   []byte(streamID),
 			Value: payload,
 		}); err != nil {
+			log.Println("upload create error", err)
 			errMsg := "analysis queue unavailable"
 			_ = jobs.UpdateProgress(ctx, jobID, "failed", 0, &errMsg, nil)
 			ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "analysis queue unavailable, try again later"})
@@ -123,8 +131,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 	}
 }
 
-// GetUploadJob is the public, shareable status + results endpoint. Anyone
-// holding the job UUID can read it.
+
 func GetUploadJob(jobs *store.JobStore, alerts *store.AlertStore) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
@@ -161,9 +168,7 @@ func GetUploadJob(jobs *store.JobStore, alerts *store.AlertStore) gin.HandlerFun
 	}
 }
 
-// GetUploadAlertImage returns a signed frame URL for an alert, but only if
-// that alert belongs to the requested job — the job UUID acts as the
-// capability token for anonymous viewers.
+
 func GetUploadAlertImage(jobs *store.JobStore, alerts *store.AlertStore) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
@@ -204,8 +209,7 @@ func GetUploadAlertImage(jobs *store.JobStore, alerts *store.AlertStore) gin.Han
 	}
 }
 
-// UpdateUploadJob is the API-key protected callback the upload ingestor uses
-// to report progress, finalization and failures.
+
 func UpdateUploadJob(jobs *store.JobStore) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 

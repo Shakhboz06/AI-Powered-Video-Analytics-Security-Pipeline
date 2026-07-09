@@ -77,7 +77,7 @@ func main() {
 	r.Use(middleware.TimeoutMiddleware(2 * time.Second))
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR", ""))},
+		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR", "")), "http://127.0.0.1:8080"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Accept", "Content-Type", "Authorization", "X-CSRF-Token", "X-API-Key"},
 		ExposeHeaders:    []string{"Link"},
@@ -156,6 +156,33 @@ func main() {
 	internal := r.Group("/api/v1/internal", auth)
 	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
 	// ─── Start server ──────────────────────────────
+
+	kafkaBroker := config.GetString("KAFKA_BROKER", "")
+	ensureUploadsTopic(kafkaBroker)
+	
+	uploadDir := config.GetString("UPLOAD_DIR", "/uploads")
+	uploadRateLimit := config.GetInt("UPLOAD_RATE_LIMIT", 5)
+
+	jobStore := store.NewJobStore(database)
+
+	uploadsWriter := kafka.NewWriter(kafka.WriterConfig{
+		Brokers: []string{kafkaBroker},
+		Topic:   uploadsTopic,
+	})
+	defer uploadsWriter.Close()
+
+
+	public := r.Group("/api/v1/public")
+	public.POST("/uploads",
+		middleware.RateLimitByIP(uploadRateLimit, time.Hour),
+		api.CreateUpload(jobStore, uploadsWriter, uploadDir),
+	)
+	public.GET("/uploads/:job_id", api.GetUploadJob(jobStore, alertStore))
+	public.GET("/uploads/:job_id/alerts/:alert_id/image", api.GetUploadAlertImage(jobStore, alertStore))
+
+	// callback used by the upload ingestor to report progress
+	internal := r.Group("/api/v1/internal", auth)
+	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
 
 	r.GET("/healthz", func(c *gin.Context) {
 

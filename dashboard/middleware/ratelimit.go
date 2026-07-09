@@ -8,10 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RateLimitByIP allows at most `limit` requests per client IP inside a
-// sliding window. It protects the anonymous upload endpoint from abuse
-// without requiring accounts. State is in-memory, which is fine for a
-// single dashboard instance.
 func RateLimitByIP(limit int, window time.Duration) gin.HandlerFunc {
 
 	type bucket struct {
@@ -52,7 +48,6 @@ func RateLimitByIP(limit int, window time.Duration) gin.HandlerFunc {
 
 		b.hits = append(b.hits, now)
 
-		// Opportunistic cleanup so idle IPs don't accumulate forever.
 		if len(buckets) > 10000 {
 			for k, v := range buckets {
 				if len(v.hits) == 0 || v.hits[len(v.hits)-1].Before(cutoff) {

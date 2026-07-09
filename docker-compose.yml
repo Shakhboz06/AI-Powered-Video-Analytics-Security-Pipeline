@@ -100,10 +100,6 @@ services:
       kafka:
         condition: service_healthy
 
-  ## ────────────────────────────────────
-  ## Upload Ingestor — streams user-uploaded
-  ## videos into the analysis pipeline
-  ## ────────────────────────────────────
   upload-ingestor:
     build:
       context: ./ingestor
@@ -117,6 +113,7 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
 
   dashboard:
     build:
@@ -173,7 +170,6 @@ services:
 volumes:
   db-data:
   uploads-data:
-
 networks:
   default:
     driver: bridge
