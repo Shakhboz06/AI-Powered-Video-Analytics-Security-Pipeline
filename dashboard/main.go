@@ -54,7 +54,7 @@ func main() {
 	r.Use(middleware.TimeoutMiddleware(2 * time.Second))
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR", ""))},
+		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR", "")), "http://127.0.0.1:8080"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Accept", "Content-Type", "Authorization", "X-CSRF-Token", "X-API-Key"},
 		ExposeHeaders:    []string{"Link"},

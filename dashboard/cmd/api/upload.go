@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,6 +46,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 
 		file, header, err := ctx.Request.FormFile("video")
 		if err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("missing or oversized 'video' file (max %d MB)", maxBytes/(1024*1024))})
 			return
 		}
@@ -52,6 +54,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 
 		ext := strings.ToLower(filepath.Ext(header.Filename))
 		if !allowedVideoExts[ext] {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "unsupported file type, expected one of: mp4, mov, avi, mkv, webm"})
 			return
 		}
@@ -60,6 +63,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		streamID := "upload-" + jobID
 
 		if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not prepare upload storage"})
 			return
 		}
@@ -67,11 +71,13 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		dstPath := filepath.Join(uploadDir, jobID+ext)
 		dst, err := os.Create(dstPath)
 		if err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not store uploaded file"})
 			return
 		}
 
 		if _, err := io.Copy(dst, file); err != nil {
+			log.Println("upload create error", err)
 			dst.Close()
 			os.Remove(dstPath)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("upload interrupted or exceeds %d MB", maxBytes/(1024*1024))})
@@ -87,6 +93,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		}
 
 		if err := jobs.Create(ctx, job); err != nil {
+			log.Println("upload create error", err)
 			os.Remove(dstPath)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not create analysis job"})
 			return
@@ -101,6 +108,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 
 		payload, err := json.Marshal(msg)
 		if err != nil {
+			log.Println("upload create error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not encode analysis job"})
 			return
 		}
@@ -112,6 +120,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 			Key:   []byte(streamID),
 			Value: payload,
 		}); err != nil {
+			log.Println("upload create error", err)
 			errMsg := "analysis queue unavailable"
 			_ = jobs.UpdateProgress(ctx, jobID, "failed", 0, &errMsg, nil)
 			ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "analysis queue unavailable, try again later"})

@@ -24,7 +24,8 @@ DETECTION_MODEL = os.getenv("DETECTION_MODEL_PATH", "models/yolo26s.pt")
 WEAPON_MODEL = os.getenv("WEAPON_MODEL_PATH", "models/weapons.pt")
 FALL_MODEL = os.getenv("FALL_MODEL_PATH", "models/fall_classifier_v2.pt")
 FIGHT_MODEL = os.getenv("FIGHT_MODEL_PATH", "models/fight_detector_v2.pt")
-POSE_MODEL= os.getenv("POSE_MODEL_PATH", "/models/yolo26m-pose.pt")
+POSE_MODEL= os.getenv("POSE_MODEL_PATH", "models/yolo26m-pose.pt")
+UPLOAD_EVIDENCE_WINDOW_MS=int(os.getenv("UPLOAD_EVIDENCE_WINDOW_MS", "30000"))
 
 # ─── Kafka setup ───────────────────────────────────────────────────────────────────
 frame_consumer = Consumer({
@@ -165,9 +166,6 @@ EVIDENCE_WINDOW_MS = 4000
 evidence_buffers = defaultdict(lambda: deque())
 
 # ─── Per-stream state sweep ───────────────────────────────────────────────
-# Upload jobs create a stream per job_id; once a job finishes its state
-# would linger forever (same leak as long-gone live cameras). Age-based
-# sweep drops everything for streams silent longer than STATE_TTL_S.
 last_seen = {}
 STATE_TTL_S = 600
 SWEEP_INTERVAL_S = 60
@@ -213,8 +211,13 @@ def process_frame(frame_bytes, stream_id, timestamp):
         jpg_bytes = buf.tobytes()
         evidence_buffers[stream_id].append((timestamp, jpg_bytes))
 
-    while evidence_buffers[stream_id] and evidence_buffers[stream_id][0][0] < timestamp - EVIDENCE_WINDOW_MS:
-        evidence_buffers[stream_id].popleft()
+    upload_window_ms = UPLOAD_EVIDENCE_WINDOW_MS
+    if stream_id.startswith("upload-"):
+        while evidence_buffers[stream_id] and evidence_buffers[stream_id][0][0] < timestamp - upload_window_ms:
+            evidence_buffers[stream_id].popleft()
+    else:
+        while evidence_buffers[stream_id] and evidence_buffers[stream_id][0][0] < timestamp - EVIDENCE_WINDOW_MS:
+            evidence_buffers[stream_id].popleft()
 
     
     
@@ -453,42 +456,43 @@ try:
             print(f"{output['camera']} → detections={res['detections']} →  keypoints={res['keypoints']} → fall_predictions={res['fall_predictions']} → fight_predictions={res['fight_predictions']} → "
                 f"latency={res['latency_ms']:.1f}ms")
             
-        alert_msg = alert_consumer.poll(0.0)
-        if alert_msg is None: 
-            pass
-        elif alert_msg.error():
-            if alert_msg.error().code() != KafkaError._PARTITION_EOF:
-                print(f"Alert consumer error: {alert_msg.error()}")
-        else:
-            data = json.loads(alert_msg.value().decode("utf-8"))
-            stream_id = data["camera"]
-
-            result = nearest_frame(stream_id, data["timestamp"], 500)
-            
-            if result is None:
-                print(f"no frame image found for alert{data['alert_id']}")
+        while True:    
+            alert_msg = alert_consumer.poll(0.0)
+            if alert_msg is None: 
+                break
+            elif alert_msg.error():
+                if alert_msg.error().code() != KafkaError._PARTITION_EOF:
+                    print(f"Alert consumer error: {alert_msg.error()}")
             else:
-                # os.makedirs("frames", exist_ok=True)
-                # with open(filename, "wb") as f:
-                #     f.write(result[1])
+                data = json.loads(alert_msg.value().decode("utf-8"))
+                stream_id = data["camera"]
 
-                filename = f"{data['alert_id']}.jpg"
+                result = nearest_frame(stream_id, data["timestamp"], 500)
+                
+                if result is None:
+                    print(f"no frame image found for alert{data['alert_id']}")
+                else:
+                    # os.makedirs("frames", exist_ok=True)
+                    # with open(filename, "wb") as f:
+                    #     f.write(result[1])
 
-                try:
-                    response = supabase.storage.from_('Alert Frames').upload(
-                        f"frame/{filename}", 
-                        result[1],
-                        file_options={
-                        "content-type": "image/jpeg",
-                        "upsert": False,
-                        },
-                    )
-                    
-                except Exception as e:
-                    print("Upload failed:", e)
+                    filename = f"{data['alert_id']}.jpg"
+
+                    try:
+                        response = supabase.storage.from_('Alert Frames').upload(
+                            f"frame/{filename}", 
+                            result[1],
+                            file_options={
+                            "content-type": "image/jpeg",
+                            "upsert": False,
+                            },
+                        )
+                        
+                    except Exception as e:
+                        print("Upload failed:", e)
 
 
-                # print(f"alert {data['alert_id']}: requested {data['timestamp']}, matched {result[0]}, diff {abs(result[0]-data['timestamp'])}ms, saved {filename}")
+                    print(f"alert {data['alert_id']}: requested {data['timestamp']}, matched {result[0]}, diff {abs(result[0]-data['timestamp'])}ms, saved {filename}")
 
         if time.time() - last_sweep >= SWEEP_INTERVAL_S:
             sweep_stale_streams()
