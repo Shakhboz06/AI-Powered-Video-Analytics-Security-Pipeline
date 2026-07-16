@@ -9,12 +9,17 @@
       <span class="hud-corner hud-tr" aria-hidden="true" />
       <span class="hud-corner hud-bl" aria-hidden="true" />
       <span class="hud-corner hud-br" aria-hidden="true" />
+      <!--
+        Continuous MJPEG stream from the dashboard hub. The browser renders the
+        multipart/x-mixed-replace response as live video natively, so binding the
+        src directly starts playback as soon as the first frame arrives.
+      -->
       <img
-        v-if="feedUrl && !imgError"
-        :src="feedUrl"
+        v-if="streamUrl"
+        :src="feedSrc"
         :alt="`Live feed from ${camera || 'camera'}`"
         class="absolute inset-0 h-full w-full object-cover"
-        @error="imgError = true"
+        @error="onStreamError"
       >
       <div
         v-else
@@ -24,7 +29,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
           <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
         </svg>
-        <p class="text-xs text-gray-500">No preview available</p>
+        <p class="text-xs text-gray-500">Select a camera to view its live feed</p>
       </div>
 
       <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
@@ -54,10 +59,9 @@
         <div class="flex items-center gap-2">
           <span
             class="app-chip border-red-500/30 bg-red-950/50 text-red-200 backdrop-blur-sm"
-            :class="loading ? 'opacity-60' : ''"
           >
             <span class="live-dot h-1.5 w-1.5 rounded-full bg-red-400" />
-            {{ loading ? 'Syncing' : 'Live' }}
+            Live
           </span>
           <span v-if="camera" class="hidden app-chip backdrop-blur-sm sm:inline-flex">
             {{ camera }}
@@ -94,20 +98,6 @@
           <p class="mt-0.5 text-xl font-semibold tabular-nums text-white sm:text-2xl">
             {{ classCount }}
           </p>
-        </div>
-      </div>
-
-      <!-- Loading overlay -->
-      <div
-        v-if="loading"
-        class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
-      >
-        <div class="flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-4 py-2 text-sm text-gray-300">
-          <svg class="h-4 w-4 animate-spin text-teal-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          Refreshing feed…
         </div>
       </div>
     </div>
@@ -157,7 +147,6 @@
 <script setup lang="ts">
 import AnimatedNumber from '~/components/ui/AnimatedNumber.vue'
 import EmptyState from '~/components/ui/EmptyState.vue'
-import { cameraImageUrl } from '~/composables/useCameraImage'
 import { latencyBgClass, latencyColorClass } from '~/composables/useChartTheme'
 import { formatRelativeAgo } from '~/composables/useRelativeTime'
 import type { Point, SecurityZone } from '~/types/security'
@@ -180,11 +169,51 @@ function polygonPoints(polygon: Point[]): string {
   return polygon.map((p) => `${p.x},${p.y}`).join(' ')
 }
 
-const imgError = ref(false)
+const config = useRuntimeConfig()
+const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
+
 const nowMs = ref(Date.now())
 let tickTimer: ReturnType<typeof setInterval> | undefined
 
-const feedUrl = computed(() => cameraImageUrl(props.camera))
+// Host-agnostic URL of the continuous MJPEG stream for the selected camera.
+// Camera names can contain spaces (e.g. "room 1"), so the name is URL-encoded.
+const streamUrl = computed(() => {
+  if (!props.camera) return ''
+  return `${apiBase}/api/v1/live/${encodeURIComponent(props.camera)}/stream`
+})
+
+// The value actually bound to <img>. It mirrors streamUrl, but reconnects append
+// a cache-busting param so the browser opens a fresh connection.
+const feedSrc = ref('')
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+
+function clearReconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = undefined
+  }
+}
+
+function openStream(bustCache = false) {
+  clearReconnect()
+  if (!streamUrl.value) {
+    feedSrc.value = ''
+    return
+  }
+  feedSrc.value = bustCache ? `${streamUrl.value}?t=${Date.now()}` : streamUrl.value
+}
+
+// MJPEG streams don't reconnect on their own: if the backend restarts or the
+// network blips, the <img> goes blank and stays blank. Re-open it after a short
+// delay so the feed self-heals.
+function onStreamError() {
+  if (reconnectTimer) return
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined
+    openStream(true)
+  }, 2000)
+}
+
 const classCount = computed(() => Object.keys(props.snapshot?.total_objects ?? {}).length)
 
 const relativeUpdated = computed(() => {
@@ -197,13 +226,15 @@ const borderClasses = computed(() => {
   return latencyBgClass(props.snapshot.latency_ms)
 })
 
-watch(() => props.camera, () => { imgError.value = false })
+// Bind the stream immediately on mount and whenever the selected camera changes.
+watch(streamUrl, () => openStream(), { immediate: true })
 
 onMounted(() => {
   tickTimer = setInterval(() => { nowMs.value = Date.now() }, 15_000)
 })
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer)
+  clearReconnect()
 })
 
 function sortedClasses(obj: Record<string, number>) {
