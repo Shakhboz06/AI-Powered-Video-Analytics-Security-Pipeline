@@ -25,23 +25,43 @@ const api = useApi()
 const frameUrl = ref<string | null>(null)
 const loading = ref(false)
 
+const max_attempts = 5
+const retry_delay_ms = 3000
+let attempts = 0
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+async function fetchFrame(id: string) {
+  loading.value = true
+  try {
+    const { signed_url } = await api.getUploadAlertImage(props.jobId, id)
+    frameUrl.value = signed_url
+    loading.value = false          
+  }
+  catch {
+    attempts++
+    if (attempts < max_attempts) {
+      retryTimer = setTimeout(() => fetchFrame(id), retry_delay_ms)
+    }
+    else {
+      loading.value = false       
+    }
+  }
+}
+
 watch(
   () => props.alertId,
-  async (id) => {
+  (id) => {
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+    attempts = 0
     frameUrl.value = null
     if (!import.meta.client || !id?.trim()) return
-    loading.value = true
-    try {
-      const { signed_url } = await api.getUploadAlertImage(props.jobId, id.trim())
-      frameUrl.value = signed_url
-    }
-    catch {
-      frameUrl.value = null
-    }
-    finally {
-      loading.value = false
-    }
+    fetchFrame(id.trim())
   },
   { immediate: true },
 )
+
+onUnmounted(() => {
+  if (retryTimer) clearTimeout(retryTimer)
+})
+
 </script>

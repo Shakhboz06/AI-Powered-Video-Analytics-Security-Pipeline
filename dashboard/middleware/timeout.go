@@ -17,10 +17,10 @@ func TimeoutMiddleware(d time.Duration) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), d)
 		defer cancel()
 
-		// injecting it back into Gin
+		
 		c.Request = c.Request.WithContext(ctx)
 
-		c.Next() // continues to handlers
+		c.Next() 
 	}
 }
 

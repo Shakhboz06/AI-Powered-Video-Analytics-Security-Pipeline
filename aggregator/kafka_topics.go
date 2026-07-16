@@ -22,7 +22,7 @@ func KafkaTopics(ctx context.Context, broker string, specs []TopicSpec) error {
     }
     defer conn.Close()
 
-    // 1) create topics
+
     var cfgs []kafka.TopicConfig
     for _, s := range specs {
         cfgs = append(cfgs, kafka.TopicConfig{
