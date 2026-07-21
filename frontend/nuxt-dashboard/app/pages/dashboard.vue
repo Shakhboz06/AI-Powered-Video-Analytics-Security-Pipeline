@@ -45,42 +45,6 @@
           <option v-for="c in cameras" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
-      <div class="flex flex-col gap-1">
-        <label class="app-label" for="monitor-interval">Auto-refresh</label>
-        <select
-          id="monitor-interval"
-          v-model.number="pollIntervalMs"
-          class="app-input min-w-[200px]"
-          @change="onPollIntervalChange"
-        >
-          <option v-for="o in POLL_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-      </div>
-      <template #actions>
-        <span class="app-chip" :class="refreshing ? 'text-teal-300' : 'text-gray-400'">
-          <span class="h-1.5 w-1.5 rounded-full" :class="refreshing ? 'live-dot bg-teal-400' : 'bg-gray-500'" />
-          {{ refreshCountdownLabel }}
-        </span>
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="refreshing"
-          @click="manualRefresh"
-        >
-          <svg
-            class="h-4 w-4"
-            :class="refreshing ? 'animate-spin' : ''"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-          </svg>
-          {{ refreshing ? 'Refreshing…' : 'Refresh now' }}
-        </button>
-      </template>
     </FilterToolbar>
 
     <div v-if="camerasError" class="app-banner-warning">{{ camerasError }}</div>
@@ -156,22 +120,7 @@ definePageMeta({
 })
 
 const api = useApi()
-const toast = useToast()
 
-const POLL_OPTIONS = [
-  { label: '3 seconds', value: 3 * 1000 },
-  { label: '1 minute', value: 60 * 1000 },
-  { label: '5 minutes', value: 5 * 60 * 1000 },
-  { label: '15 minutes', value: 15 * 60 * 1000 },
-  { label: '30 minutes', value: 30 * 60 * 1000 },
-  { label: '1 hour', value: 60 * 60 * 1000 },
-] as const
-
-const POLL_MS_STORAGE_KEY = 'live_dashboard_poll_ms'
-
-const pollIntervalMs = ref<number>(5 * 60 * 1000)
-const refreshCountdownSec = ref(0)
-const refreshing = ref(false)
 const latencyHistory = ref<number[]>([])
 
 const cameras = ref<string[]>([])
@@ -198,16 +147,6 @@ const statusError = ref<string | null>(null)
 const lastUpdatedFormatted = computed(() => {
   if (!lastUpdatedAt.value) return null
   return lastUpdatedAt.value.toLocaleString()
-})
-
-const refreshCountdownLabel = computed(() => {
-  if (refreshing.value) return 'Updating…'
-  const sec = refreshCountdownSec.value
-  if (sec <= 0) return 'Next refresh soon'
-  if (sec < 60) return `Next in ${sec}s`
-  const min = Math.floor(sec / 60)
-  const rem = sec % 60
-  return rem ? `Next in ${min}m ${rem}s` : `Next in ${min}m`
 })
 
 const onlineCount = computed(() =>
@@ -253,58 +192,6 @@ const recentActivity = computed<ActivityEvent[]>(() => {
   return events.slice(0, 8)
 })
 
-
-let pollTimer: ReturnType<typeof setInterval> | undefined
-let countdownTimer: ReturnType<typeof setInterval> | undefined
-
-function isValidPollMs(ms: number) {
-  return POLL_OPTIONS.some(o => o.value === ms)
-}
-
-function resetCountdown() {
-  refreshCountdownSec.value = Math.round(pollIntervalMs.value / 1000)
-}
-
-function startCountdownTimer() {
-  if (countdownTimer) clearInterval(countdownTimer)
-  resetCountdown()
-  countdownTimer = setInterval(() => {
-    refreshCountdownSec.value = Math.max(0, refreshCountdownSec.value - 1)
-  }, 1000)
-}
-
-async function runPollTick(silent = false) {
-  if (!silent) refreshing.value = true
-  try {
-    await loadCameras()
-    await loadLive()
-    await loadZones()
-    await loadStatusForCameras()
-    resetCountdown()
-  }
-  finally {
-    refreshing.value = false
-  }
-}
-
-async function manualRefresh() {
-  await runPollTick()
-  toast.success('Live data refreshed')
-}
-
-function startPollTimer() {
-  if (pollTimer) clearInterval(pollTimer)
-  resetCountdown()
-  pollTimer = setInterval(() => runPollTick(true), pollIntervalMs.value)
-}
-
-function onPollIntervalChange() {
-  if (import.meta.client) {
-    localStorage.setItem(POLL_MS_STORAGE_KEY, String(pollIntervalMs.value))
-  }
-  startPollTimer()
-  startCountdownTimer()
-}
 
 async function loadCameras() {
   camerasLoading.value = true
@@ -412,22 +299,15 @@ async function loadStatusForCameras() {
   }
 }
 
+// The live video is now a continuous MJPEG stream (see LiveSnapshotCard), so the
+// page no longer polls to refresh the feed. We load the supporting detection
+// metadata (KPIs, camera status, class breakdown) once on mount; the camera
+// watcher below refreshes the selected camera's snapshot when it changes.
 onMounted(async () => {
-  if (import.meta.client) {
-    const raw = localStorage.getItem(POLL_MS_STORAGE_KEY)
-    if (raw != null) {
-      const n = Number(raw)
-      if (!Number.isNaN(n) && isValidPollMs(n)) pollIntervalMs.value = n
-    }
-  }
-  await runPollTick(true)
-  startPollTimer()
-  startCountdownTimer()
-})
-
-onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
-  if (countdownTimer) clearInterval(countdownTimer)
+  await loadCameras()
+  await loadLive()
+  await loadZones()
+  await loadStatusForCameras()
 })
 
 async function loadZones() {

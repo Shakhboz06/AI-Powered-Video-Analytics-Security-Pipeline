@@ -122,7 +122,7 @@ func CreateUpload(jobs *store.JobStore, writer *kafka.Writer, uploadDir string) 
 		}); err != nil {
 			log.Println("upload create error", err)
 			errMsg := "analysis queue unavailable"
-			_ = jobs.UpdateProgress(ctx, jobID, "failed", 0, &errMsg, nil)
+			_ = jobs.UpdateProgress(context.Background(), jobID, "failed", 0, &errMsg, nil)
 			ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "analysis queue unavailable, try again later"})
 			return
 		}

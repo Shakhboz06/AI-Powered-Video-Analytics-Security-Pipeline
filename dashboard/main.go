@@ -13,6 +13,7 @@ import (
 
 	"video-analytics-pipe/config"
 	"video-analytics-pipe/dashboard/internal/auth"
+	"video-analytics-pipe/dashboard/internal/live"
 	"video-analytics-pipe/dashboard/middleware"
 	"video-analytics-pipe/db/postgres"
 	"video-analytics-pipe/db/redis/cache"
@@ -73,9 +74,7 @@ func main() {
 	apiKey := config.GetString("AUTH_API_KEY", "")
 
 	r := gin.Default()
-
-	r.Use(middleware.TimeoutMiddleware(2 * time.Second))
-
+	
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{config.GetString("CORS_ALLOWED_ORIGIN", config.GetString("FRONTEND_ADDR", "")), "http://127.0.0.1:8080"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -89,13 +88,13 @@ func main() {
 	if err != nil {
 		panic("failed to connect to database: " + err.Error())
 	}
-
+	
 	userStore := store.NewUserStore(database)
 	r.POST("/api/v1/dashboard/user/register", api.UserRegister(userStore, jwtAuth))
 	r.POST("/api/v1/dashboard/user/login", api.UserLogin(userStore, jwtAuth))
-
-	// ✅ Protected routes
+	
 	protected := r.Group("/api/v1/dashboard")
+	protected.Use(middleware.TimeoutMiddleware(2 * time.Second))
 	protected.Use(middleware.AuthTokenMiddleware(userStore, jwtAuth))
 	protected.GET("/user", api.LoginToDashboard(userStore))
 
@@ -128,35 +127,8 @@ func main() {
 	apis.GET("cameras", api.GetCameraList(cameraStore))
 	apis.PUT("cameras/:id", api.UpdateCamera(cameraStore))
 	apis.DELETE("cameras/:id", api.DeleteCamera(cameraStore))
-
-	// ─── Public video analysis (anonymous upload + shareable results) ──
-	kafkaBroker := config.GetString("KAFKA_BROKER", "")
-	ensureUploadsTopic(kafkaBroker)
-
-	uploadsWriter := kafka.NewWriter(kafka.WriterConfig{
-		Brokers: []string{kafkaBroker},
-		Topic:   uploadsTopic,
-	})
-	defer uploadsWriter.Close()
-
-	uploadDir := config.GetString("UPLOAD_DIR", "/uploads")
-	uploadRateLimit := config.GetInt("UPLOAD_RATE_LIMIT", 10)
-
-	jobStore := store.NewJobStore(database)
-
-	public := r.Group("/api/v1/public")
-	public.POST("/uploads",
-		middleware.RateLimitByIP(uploadRateLimit, time.Hour),
-		api.CreateUpload(jobStore, uploadsWriter, uploadDir),
-	)
-	public.GET("/uploads/:job_id", api.GetUploadJob(jobStore, alertStore))
-	public.GET("/uploads/:job_id/alerts/:alert_id/image", api.GetUploadAlertImage(jobStore, alertStore))
-
-	// callback used by the upload ingestor to report progress
-	internal := r.Group("/api/v1/internal", auth)
-	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
-	// ─── Start server ──────────────────────────────
-
+	
+	
 	kafkaBroker := config.GetString("KAFKA_BROKER", "")
 	ensureUploadsTopic(kafkaBroker)
 	
@@ -170,6 +142,13 @@ func main() {
 		Topic:   uploadsTopic,
 	})
 	defer uploadsWriter.Close()
+	
+	streamLive := live.NewHub()
+	go streamLive.Run()
+
+	r.GET("/api/v1/live/:camera/stream", api.StreamLive(streamLive))
+	// apis.GET("/live/:camera/stream", api.StreamLive(streamLive))
+
 
 
 	public := r.Group("/api/v1/public")
@@ -180,7 +159,7 @@ func main() {
 	public.GET("/uploads/:job_id", api.GetUploadJob(jobStore, alertStore))
 	public.GET("/uploads/:job_id/alerts/:alert_id/image", api.GetUploadAlertImage(jobStore, alertStore))
 
-	// callback used by the upload ingestor to report progress
+	
 	internal := r.Group("/api/v1/internal", auth)
 	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
 
