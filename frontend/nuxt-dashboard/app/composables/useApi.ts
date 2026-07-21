@@ -47,16 +47,16 @@ export function normalizeClassSummary(raw: unknown): Record<string, number> {
 
 export function useApi() {
   const config = useRuntimeConfig()
-  const token = useCookie<string | null>('auth_token')
 
   const base = () => (config.public.apiBase as string).replace(/\/$/, '')
 
+  // Auth now rides on the browser's httpOnly `auth_token` cookie, which JS
+  // can't read. Every cross-origin call opts in with `credentials: 'include'`
+  // so the browser sends the cookie (and stores it on login/register).
+  const CREDS = 'include' as const
+
   function headersAuthOnly(): Record<string, string> {
-    const h: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-    if (token.value) h.Authorization = `Bearer ${token.value}`
-    return h
+    return { 'Content-Type': 'application/json' }
   }
 
   function headersData(): Record<string, string> {
@@ -71,6 +71,7 @@ export function useApi() {
       method: 'POST',
       body,
       headers: { 'Content-Type': 'application/json' },
+      credentials: CREDS,
     })
   }
 
@@ -79,18 +80,21 @@ export function useApi() {
       method: 'POST',
       body,
       headers: { 'Content-Type': 'application/json' },
+      credentials: CREDS,
     })
   }
 
   async function getCurrentUser() {
     return await $fetch<AuthUser>(`${base()}/api/v1/dashboard/user`, {
       headers: headersAuthOnly(),
+      credentials: CREDS,
     })
   }
 
   async function getCameras() {
     const res = await $fetch<{ cameras: Array<CameraConfig | string> }>(`${base()}/api/v1/cameras`, {
       headers: headersData(),
+      credentials: CREDS,
     })
     return {
       cameras: (res.cameras ?? [])
@@ -103,6 +107,7 @@ export function useApi() {
   async function getCameraConfigs() {
     return await $fetch<CameraConfigResponse>(`${base()}/api/v1/cameras`, {
       headers: headersData(),
+      credentials: CREDS,
     })
   }
 
@@ -116,6 +121,7 @@ export function useApi() {
     return await $fetch<{ camera: CameraConfig }>(`${base()}/api/v1/cameras`, {
       method: 'POST',
       headers: headersData(),
+      credentials: CREDS,
       body,
     })
   }
@@ -124,6 +130,7 @@ export function useApi() {
     return await $fetch<{ camera: CameraConfig }>(`${base()}/api/v1/cameras/${id}`, {
       method: 'PUT',
       headers: headersData(),
+      credentials: CREDS,
       body,
     })
   }
@@ -132,18 +139,21 @@ export function useApi() {
     await $fetch<void>(`${base()}/api/v1/cameras/${id}`, {
       method: 'DELETE',
       headers: headersData(),
+      credentials: CREDS,
     })
   }
 
   async function getDetectionCameras() {
     return await $fetch<CamerasResponse>(`${base()}/api/v1/detections/cameras`, {
       headers: headersData(),
+      credentials: CREDS,
     })
   }
 
   async function getMetrics(camera: string, time: string) {
     return await $fetch<MetricsResponse>(`${base()}/api/v1/detections/metrics`, {
       headers: headersData(),
+      credentials: CREDS,
       query: { camera, time },
     })
   }
@@ -151,6 +161,7 @@ export function useApi() {
   async function getLive(camera: string) {
     return await $fetch<LiveResponse>(`${base()}/api/v1/detections/live`, {
       headers: headersData(),
+      credentials: CREDS,
       query: { camera },
     })
   }
@@ -163,6 +174,7 @@ export function useApi() {
   }) {
     return await $fetch<SummaryResponse>(`${base()}/api/v1/detections/summary`, {
       headers: headersData(),
+      credentials: CREDS,
       query: {
         camera: params.camera,
         bucket: params.bucket,
@@ -175,6 +187,7 @@ export function useApi() {
   async function getClasses(camera: string, start: string, end: string) {
     const res = await $fetch<{ class_summary: unknown }>(`${base()}/api/v1/detections/class/summary`, {
       headers: headersData(),
+      credentials: CREDS,
       query: { camera, start, end },
     })
     return {
@@ -190,6 +203,7 @@ export function useApi() {
   }) {
     return await $fetch<HealthResponse>(`${base()}/api/v1/detections/latency`, {
       headers: headersData(),
+      credentials: CREDS,
       query: {
         camera: params.camera,
         start: params.start,
@@ -213,6 +227,7 @@ export function useApi() {
   async function listZones(camera: string) {
     return await $fetch<ZoneListResponse>(`${base()}/api/v1/zones/list`, {
       headers: headersData(),
+      credentials: CREDS,
       query: { camera },
     })
   }
@@ -221,6 +236,7 @@ export function useApi() {
     return await $fetch<{ data: SecurityZone }>(`${base()}/api/v1/zones`, {
       method: 'POST',
       headers: headersData(),
+      credentials: CREDS,
       body,
     })
   }
@@ -229,6 +245,7 @@ export function useApi() {
     return await $fetch<{ data: SecurityZone }>(`${base()}/api/v1/zones/${id}`, {
       method: 'PUT',
       headers: headersData(),
+      credentials: CREDS,
       body,
     })
   }
@@ -237,12 +254,14 @@ export function useApi() {
     await $fetch<void>(`${base()}/api/v1/zones/${id}`, {
       method: 'DELETE',
       headers: headersData(),
+      credentials: CREDS,
     })
   }
 
   async function listAlerts(params: { camera?: string; status?: 'all' | 'new' | 'acknowledged' | 'resolved' }) {
     return await $fetch<{ alerts: SecurityAlert[] }>(`${base()}/api/v1/alerts`, {
       headers: headersData(),
+      credentials: CREDS,
       query: {
         ...(params.camera ? { camera: params.camera } : {}),
         ...(params.status && params.status !== 'all' ? { status: params.status } : {}),
@@ -254,6 +273,7 @@ export function useApi() {
     return await $fetch<{ alert: SecurityAlert }>(`${base()}/api/v1/alerts/${id}`, {
       method: 'PATCH',
       headers: headersData(),
+      credentials: CREDS,
       body: { status },
     })
   }
@@ -261,7 +281,9 @@ export function useApi() {
   async function getAlertImage(alertId: string) {
     const id = alertId.trim()
     // Same-origin proxy (server adds X-API-Key) — mirrors /api/alerts/stream
-    return await $fetch<{ signed_url: string }>(`/api/alerts/${encodeURIComponent(id)}/image`)
+    return await $fetch<{ signed_url: string }>(`/api/alerts/${encodeURIComponent(id)}/image`, {
+      credentials: CREDS,
+    })
   }
 
   function alertStreamUrl() {
@@ -278,6 +300,7 @@ export function useApi() {
 
       const xhr = new XMLHttpRequest()
       xhr.open('POST', `${base()}/api/v1/public/uploads`)
+      xhr.withCredentials = true
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && onProgress)
@@ -301,12 +324,17 @@ export function useApi() {
   }
 
   async function getUploadJob(jobId: string) {
-    return await $fetch<UploadJobResponse>(`${base()}/api/v1/public/uploads/${encodeURIComponent(jobId)}`)
+    return await $fetch<UploadJobResponse>(`${base()}/api/v1/public/uploads/${encodeURIComponent(jobId)}`, {
+      credentials: CREDS,
+    })
   }
 
   async function getUploadAlertImage(jobId: string, alertId: string) {
     return await $fetch<{ signed_url: string }>(
       `${base()}/api/v1/public/uploads/${encodeURIComponent(jobId)}/alerts/${encodeURIComponent(alertId)}/image`,
+      {
+        credentials: CREDS,
+      },
     )
   }
 

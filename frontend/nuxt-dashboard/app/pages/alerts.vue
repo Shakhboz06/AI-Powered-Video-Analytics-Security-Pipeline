@@ -508,7 +508,7 @@ function connectAlertStream() {
     reconnectTimer = null
   }
 
-  const stream = new EventSource(api.alertStreamUrl())
+  const stream = new EventSource(api.alertStreamUrl(), {withCredentials: true})
   alertStream = stream
 
   stream.onopen = () => {

@@ -1,7 +1,6 @@
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
   const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
-  const apiKey = config.public.apiKey as string
 
   const controller = new AbortController()
   event.node.req.on('close', () => controller.abort())
@@ -9,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const upstream = await fetch(`${apiBase}/api/v1/alerts/stream`, {
     headers: {
       Accept: 'text/event-stream',
-      ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+      Cookie: getRequestHeader(event, 'Cookie') ?? '',
     },
     signal: controller.signal,
   })
