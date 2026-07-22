@@ -100,7 +100,7 @@
         <ZoneDrawer
           :frame-w="FRAME_W"
           :frame-h="FRAME_H"
-          :background-candidates="backgroundCandidates"
+          :camera="selectedCamera"
           :saved-zones="decoratedSavedZones"
           :selected-id="selectedZoneId"
           :draft="isDrawing ? draft : []"
@@ -345,28 +345,6 @@ const liveSnapshot = ref<{
 } | null>(null)
 const liveLoading = ref(false)
 let livePoll: ReturnType<typeof setInterval> | null = null
-
-function sanitizeCameraFilePart(name: string) {
-  const s = name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
-  return s || 'camera'
-}
-
-function cameraBackgroundCandidates(camera: string | undefined): string[] {
-  if (!camera) return ['/camera-backgrounds/cam1.jpg']
-  const safe = sanitizeCameraFilePart(camera)
-  let h = 0
-  for (let i = 0; i < camera.length; i++)
-    h = (h + camera.charCodeAt(i) * (i + 1)) % 100000
-  const variant = (h % 2) + 1
-  return [
-    `/camera-backgrounds/${safe}.jpg`,
-    `/camera-backgrounds/cam${variant}.jpg`,
-    '/camera-backgrounds/cam1.jpg',
-  ]
-}
-
-const backgroundCandidates = computed(() =>
-  cameraBackgroundCandidates(selectedCamera.value || undefined))
 
 const liveSummary = computed(() => {
   const s = liveSnapshot.value
