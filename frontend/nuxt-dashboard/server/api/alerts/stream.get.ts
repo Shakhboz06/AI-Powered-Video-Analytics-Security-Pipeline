@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const upstream = await fetch(`${apiBase}/api/v1/alerts/stream`, {
     headers: {
       Accept: 'text/event-stream',
-      cookie: getRequestHeader(event, 'cookie') ?? '',
+      Cookie: getRequestHeader(event, 'Cookie') ?? '',
     },
     signal: controller.signal,
   })
