@@ -5,6 +5,9 @@ export default defineEventHandler(async (event) => {
   const controller = new AbortController()
   event.node.req.on('close', () => controller.abort())
 
+  // This runs server-side (no cookie jar), so `credentials: 'include'` would
+  // do nothing — forward the browser's auth_token cookie to the upstream
+  // stream explicitly instead of an X-API-Key header.
   const upstream = await fetch(`${apiBase}/api/v1/alerts/stream`, {
     headers: {
       Accept: 'text/event-stream',

@@ -5,11 +5,24 @@
       class="relative w-full max-w-[640px] rounded-lg border border-gray-700 bg-gray-900/50 overflow-hidden select-none touch-none"
       :class="isDrawing ? 'ring-2 ring-teal-500/40' : ''"
     >
+      <!--
+        Live MJPEG feed from the dashboard hub, sitting behind the drawing
+        canvas. The browser renders the multipart/x-mixed-replace response as
+        continuous video natively; the canvas above stays transparent so zones
+        are drawn over the real camera image (mirrors the dashboard's live card).
+      -->
+      <img
+        v-if="streamUrl"
+        :src="feedSrc"
+        :alt="`Live feed from ${camera || 'camera'}`"
+        class="pointer-events-none absolute inset-0 z-0 h-full w-full object-fill"
+        @error="onStreamError"
+      >
       <canvas
         ref="canvasRef"
         :width="frameW"
         :height="frameH"
-        class="block w-full h-auto cursor-crosshair"
+        class="relative z-10 block w-full h-auto cursor-crosshair"
         :class="cursorClass"
         @click="onCanvasClick"
         @dblclick.prevent="onDblClick"
@@ -19,7 +32,7 @@
       <!-- Coordinate tooltip while drawing -->
       <div
         v-if="isDrawing && cursorTip.visible"
-        class="pointer-events-none absolute z-20 rounded border border-gray-600 bg-gray-950/95 px-2 py-1 text-[11px] font-mono text-teal-200 shadow-lg"
+        class="pointer-events-none absolute z-30 rounded border border-gray-600 bg-gray-950/95 px-2 py-1 text-[11px] font-mono text-teal-200 shadow-lg"
         :style="{ left: `${cursorTip.x}px`, top: `${cursorTip.y}px`, transform: 'translate(12px, 12px)' }"
       >
         x: {{ cursorTip.px }}, y: {{ cursorTip.py }}
@@ -27,7 +40,7 @@
       <!-- Overlay prompt when drawing with no points yet -->
       <div
         v-if="isDrawing && draft.length === 0"
-        class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+        class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
       >
         <div class="rounded-xl border border-teal-500/30 bg-black/70 px-6 py-4 text-center backdrop-blur-sm">
           <svg class="mx-auto mb-2 h-8 w-8 text-teal-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -47,8 +60,8 @@ import type { Point } from '~/types/security'
 const props = defineProps<{
   frameW: number
   frameH: number
-  /** Try in order until one loads (e.g. cam-specific .jpg, then fallback .jpg). */
-  backgroundCandidates: string[]
+  /** Currently selected camera; its live MJPEG feed is drawn behind the canvas. */
+  camera: string
   savedZones: Array<{
     id: number
     name: string
@@ -71,7 +84,49 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const wrapRef = ref<HTMLElement | null>(null)
 
-const bgImage = shallowRef<HTMLImageElement | null>(null)
+const config = useRuntimeConfig()
+const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
+
+// Host-agnostic URL of the continuous MJPEG stream for the selected camera.
+// Camera names can contain spaces (e.g. "room 1"), so the name is URL-encoded.
+const streamUrl = computed(() => {
+  if (!props.camera) return ''
+  return `${apiBase}/api/v1/live/${encodeURIComponent(props.camera)}/stream`
+})
+
+// The value actually bound to <img>. Mirrors streamUrl, but reconnects append a
+// cache-busting param so the browser opens a fresh connection.
+const feedSrc = ref('')
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+
+function clearReconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = undefined
+  }
+}
+
+function openStream(bustCache = false) {
+  clearReconnect()
+  if (!streamUrl.value) {
+    feedSrc.value = ''
+    nextTick(() => draw())
+    return
+  }
+  feedSrc.value = bustCache ? `${streamUrl.value}?t=${Date.now()}` : streamUrl.value
+  nextTick(() => draw())
+}
+
+// MJPEG streams don't reconnect on their own: if the backend restarts or the
+// network blips, the <img> goes blank and stays blank. Re-open it after a short
+// delay so the feed self-heals.
+function onStreamError() {
+  if (reconnectTimer) return
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined
+    openStream(true)
+  }, 2000)
+}
 
 const hoveredZoneId = ref<number | null>(null)
 
@@ -126,47 +181,8 @@ function zoneHitTest(p: Point): number | null {
   return null
 }
 
-function loadBackground() {
-  if (import.meta.server) {
-    nextTick(() => draw())
-    return
-  }
-  bgImage.value = null
-  const list = props.backgroundCandidates
-  if (!list.length) {
-    nextTick(() => draw())
-    return
-  }
-  const tryLoad = (idx: number) => {
-    if (idx >= list.length) {
-      nextTick(() => draw())
-      return
-    }
-    const url = list[idx]
-    if (!url) {
-      tryLoad(idx + 1)
-      return
-    }
-    const im = new Image()
-    im.onload = () => {
-      bgImage.value = im
-      nextTick(() => draw())
-    }
-    im.onerror = () => {
-      tryLoad(idx + 1)
-    }
-    im.src = url
-  }
-  tryLoad(0)
-}
-
-watch(
-  () => [...props.backgroundCandidates],
-  () => {
-    loadBackground()
-  },
-  { immediate: true },
-)
+// Bind the stream immediately and whenever the selected camera changes.
+watch(streamUrl, () => openStream(), { immediate: true })
 
 watch(
   () => props.isDrawing,
@@ -219,19 +235,10 @@ function onDblClick() {
   emit('finish')
 }
 
+// Fallback backdrop drawn only when there is no live feed (no camera selected).
+// When a camera is streaming, the canvas is left transparent so the MJPEG <img>
+// behind it shows through.
 function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const im = bgImage.value
-  if (im && im.complete && im.naturalWidth > 0) {
-    const iw = im.naturalWidth
-    const ih = im.naturalHeight
-    const scale = Math.max(w / iw, h / ih)
-    const dw = iw * scale
-    const dh = ih * scale
-    const ox = (w - dw) / 2
-    const oy = (h - dh) / 2
-    ctx.drawImage(im, ox, oy, dw, dh)
-    return
-  }
   const g = ctx.createLinearGradient(0, 0, w, h)
   g.addColorStop(0, '#1e293b')
   g.addColorStop(0.5, '#0f172a')
@@ -261,7 +268,9 @@ function draw() {
   if (!ctx) return
   const { frameW: w, frameH: h } = props
   ctx.clearRect(0, 0, w, h)
-  drawBackground(ctx, w, h)
+  // Keep the canvas transparent over a live feed; only paint the fallback grid
+  // when no camera stream is bound.
+  if (!streamUrl.value) drawBackground(ctx, w, h)
 
   props.savedZones.forEach((z) => {
     if (z.polygon.length < 3) return
@@ -339,7 +348,6 @@ watch(
     isDraftComplete: props.isDraftComplete,
     isDrawing: props.isDrawing,
     hover: hoveredZoneId.value,
-    bg: bgImage.value,
   }),
   () => nextTick(() => draw()),
   { deep: true },
@@ -347,6 +355,10 @@ watch(
 
 onMounted(() => {
   nextTick(() => draw())
+})
+
+onUnmounted(() => {
+  clearReconnect()
 })
 
 defineExpose({ redraw: draw })

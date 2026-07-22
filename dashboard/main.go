@@ -75,8 +75,9 @@ func main() {
 	protected.Use(middleware.AuthTokenMiddleware(userStore, jwtAuth))
 	protected.GET("/user", api.LoginToDashboard(userStore))
 
-	auth := middleware.AuthByAPIKey(apiKey)
-	apis := r.Group("/api/v1", auth)
+	
+	external_auth := middleware.AuthTokenMiddleware(userStore, jwtAuth)
+	apis := r.Group("/api/v1", external_auth)
 
 	detStore := store.NewDetStore(database)
 	apis.GET("/detections/cameras", getAllCameras(detStore))
@@ -123,8 +124,9 @@ func main() {
 	streamLive := live.NewHub()
 	go streamLive.Run()
 
-	r.GET("/api/v1/live/:camera/stream", api.StreamLive(streamLive))
-	// apis.GET("/live/:camera/stream", api.StreamLive(streamLive))
+	
+	liveGroup := r.Group("/api/v1/live", external_auth)
+	liveGroup.GET("/:camera/stream", api.StreamLive(streamLive))
 
 
 
@@ -136,10 +138,11 @@ func main() {
 	public.GET("/uploads/:job_id", api.GetUploadJob(jobStore, alertStore))
 	public.GET("/uploads/:job_id/alerts/:alert_id/image", api.GetUploadAlertImage(jobStore, alertStore))
 
-	
-	internal := r.Group("/api/v1/internal", auth)
+	internal_auth := middleware.AuthByAPIKey(apiKey)
+	internal := r.Group("/api/v1/internal", internal_auth)
 	internal.PATCH("/uploads/:job_id", api.UpdateUploadJob(jobStore))
-
+	internal.GET("/cameras", api.GetCameraList(cameraStore))
+	
 	r.GET("/healthz", func(c *gin.Context) {
 
 		reqCtx, cancel := context.WithTimeout(c, 2*time.Second)

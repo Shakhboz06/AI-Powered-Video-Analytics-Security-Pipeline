@@ -21,7 +21,7 @@ func StreamLive(hub *live.Hub) gin.HandlerFunc {
 		ctx.Header("Connection", "keep-alive")
 
 		ctx.Stream(func(w io.Writer) bool {
-
+			
 			select {
 			case frame, ok := <-ch:
 				if !ok {
