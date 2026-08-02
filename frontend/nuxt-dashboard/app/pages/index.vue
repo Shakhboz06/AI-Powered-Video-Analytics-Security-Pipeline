@@ -181,17 +181,8 @@
       </div>
     </section>
 
-    <!-- Trusted by / social proof -->
-    <section class="relative z-10 mx-auto max-w-7xl px-5 py-12 md:px-8">
-      <div class="text-center">
-        <p class="text-sm font-medium uppercase tracking-widest text-gray-500">Trusted by security teams</p>
-      </div>
-      <div class="mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-10">
-        <div v-for="company in trustedCompanies" :key="company" class="flex h-12 items-center rounded-lg border border-white/5 bg-white/[0.03] px-6 opacity-50 transition-opacity hover:opacity-80">
-          <span class="text-sm font-semibold tracking-wide text-gray-400">{{ company }}</span>
-        </div>
-      </div>
-    </section>
+    <!-- Detection evidence gallery (replaces the logo wall) -->
+    <DetectionGallery />
 
     <section class="relative z-10 mx-auto max-w-7xl px-5 py-16 md:px-8">
       <div class="app-card relative overflow-hidden p-10 text-center md:p-14">
@@ -233,6 +224,7 @@
 <script setup lang="ts">
 import AppBrand from '~/components/ui/AppBrand.vue'
 import AmbientMesh from '~/components/ui/AmbientMesh.vue'
+import DetectionGallery from '~/components/DetectionGallery.vue'
 
 const marqueeTags = [
   'YOLO Detection', 'Pose Estimation', 'Fall ML', 'Fight Classification',
@@ -248,7 +240,6 @@ const year = new Date().getFullYear()
 
 const trustBadges = ['Sub-second detection', 'Multi-camera fleet', '24/7 alerting', 'ML + rules hybrid']
 
-const trustedCompanies = ['Apex Security', 'DefendCo', 'VisionGuard', 'SafeNet Corp', 'SentryAI']
 
 const clock = ref('--:--:--')
 let timer: ReturnType<typeof setInterval> | null = null
