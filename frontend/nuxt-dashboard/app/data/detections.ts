@@ -1,76 +1,43 @@
 /**
  * Landing-page "Detected in real footage" gallery data.
  *
- * Edit this list freely — the DetectionGallery component renders whatever is
- * here (3–6 cards read best). Images are local static assets under
- * `public/detections/`; reference them with a root-absolute path.
+ * Every entry is taken straight from the demo Metadata/*.txt files, so the
+ * cards show real detections. Images are local static assets under
+ * `public/detections/`. Edit this list freely — DetectionGallery renders it.
  *
- * Fields:
- *  - image:      path under /public (e.g. '/detections/fall.jpg')
- *  - type:       detection kind — drives the badge icon/colour via useAlertMeta
- *                ('brandishing' | 'fighting' | 'falling' | 'abandoned_object'
- *                 | 'running' | 'intrusion' | 'loitering')
- *  - label:      display text on the badge (overrides the type's default label)
- *  - timestamp:  where in the clip it was detected (free text, e.g. '00:42')
- *  - severity:   'critical' | 'high' | 'medium' | 'low' — drives colour coding
- *  - confidence: model confidence 0–1 (shown as a percentage)
+ * Fields (all present in the source metadata):
+ *  - image:     path under /public (e.g. '/detections/falling-1.jpg')
+ *  - type:      detection kind — drives the badge icon/colour via useAlertMeta
+ *               ('brandishing' | 'fighting' | 'falling' | 'abandoned_object'
+ *                | 'running' | 'intrusion' | 'loitering')
+ *  - label:     display text on the badge
+ *  - object:    what was detected (metadata "Object", e.g. 'person', 'suitcase')
+ *  - camera:    source camera (metadata "Camera")
+ *  - timestamp: capture time (metadata "Recorded at", time-of-day)
+ *  - severity:  'critical' | 'high' | 'medium' | 'low' — drives colour coding
  */
 export interface DetectionCard {
   image: string
   type: string
   label: string
+  object: string
+  camera: string
   timestamp: string
   severity: 'critical' | 'high' | 'medium' | 'low'
-  confidence: number
 }
 
 export const detectionCards: DetectionCard[] = [
-  {
-    image: '/detections/weapon-brandishing.jpg',
-    type: 'brandishing',
-    label: 'Weapon brandishing',
-    timestamp: '00:12',
-    severity: 'critical',
-    confidence: 0.96,
-  },
-  {
-    image: '/detections/fighting.jpg',
-    type: 'fighting',
-    label: 'Fight',
-    timestamp: '00:34',
-    severity: 'critical',
-    confidence: 0.91,
-  },
-  {
-    image: '/detections/fall.jpg',
-    type: 'falling',
-    label: 'Fall',
-    timestamp: '00:07',
-    severity: 'medium',
-    confidence: 0.88,
-  },
-  {
-    image: '/detections/abandoned-object.jpg',
-    type: 'abandoned_object',
-    label: 'Abandoned object',
-    timestamp: '01:26',
-    severity: 'medium',
-    confidence: 0.83,
-  },
-  {
-    image: '/detections/weapon-brandishing-2.jpg',
-    type: 'brandishing',
-    label: 'Weapon brandishing',
-    timestamp: '00:58',
-    severity: 'critical',
-    confidence: 0.94,
-  },
-  {
-    image: '/detections/fall-2.jpg',
-    type: 'falling',
-    label: 'Fall',
-    timestamp: '00:21',
-    severity: 'medium',
-    confidence: 0.86,
-  },
+  { image: '/detections/weapon-brandishing-1.jpg', type: 'brandishing', label: 'Weapon brandishing', object: 'person', camera: 'yard', timestamp: '9:42:31 PM', severity: 'critical' },
+  { image: '/detections/fighting-1.jpg', type: 'fighting', label: 'Fight', object: 'Group of people', camera: 'warehouse', timestamp: '10:34:13 PM', severity: 'critical' },
+  { image: '/detections/falling-2.jpg', type: 'falling', label: 'Fall', object: 'person', camera: 'room 2', timestamp: '8:23:14 PM', severity: 'critical' },
+  { image: '/detections/running-1.jpg', type: 'running', label: 'Running', object: 'person', camera: 'main square', timestamp: '10:55:51 PM', severity: 'medium' },
+  { image: '/detections/abandoned-object-1.jpg', type: 'abandoned_object', label: 'Abandoned object', object: 'suitcase', camera: 'living room 1', timestamp: '9:26:07 PM', severity: 'medium' },
+  { image: '/detections/weapon-brandishing-2.jpg', type: 'brandishing', label: 'Weapon brandishing', object: 'person', camera: 'yard', timestamp: '9:42:46 PM', severity: 'critical' },
+  { image: '/detections/falling-1.jpg', type: 'falling', label: 'Fall', object: 'person', camera: 'cam 1', timestamp: '7:35:52 PM', severity: 'medium' },
+  { image: '/detections/fighting-2.jpg', type: 'fighting', label: 'Fight', object: 'Group of people', camera: 'shop', timestamp: '10:47:39 PM', severity: 'critical' },
+  { image: '/detections/weapon-brandishing-3.jpg', type: 'brandishing', label: 'Weapon brandishing', object: 'person', camera: 'house garden', timestamp: '9:50:54 PM', severity: 'critical' },
+  { image: '/detections/falling-5.jpg', type: 'falling', label: 'Fall', object: 'person', camera: 'lobby', timestamp: '10:42:44 PM', severity: 'critical' },
+  { image: '/detections/falling-4.jpg', type: 'falling', label: 'Fall', object: 'person', camera: 'cam 2', timestamp: '8:17:30 PM', severity: 'critical' },
+  { image: '/detections/weapon-brandishing-4.jpg', type: 'brandishing', label: 'Weapon brandishing', object: 'person', camera: 'kitchen', timestamp: '10:29:16 PM', severity: 'critical' },
+  { image: '/detections/falling-3.jpg', type: 'falling', label: 'Fall', object: 'person', camera: 'office 2', timestamp: '8:35:20 PM', severity: 'medium' },
 ]
