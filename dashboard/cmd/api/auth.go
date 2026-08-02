@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"video-analytics-pipe/dashboard/internal/auth"
 	"video-analytics-pipe/dashboard/internal/store"
-
+	"video-analytics-pipe/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -64,6 +64,8 @@ func UserRegister(s *store.UserStore, a *auth.JWTAuthenticator) gin.HandlerFunc 
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign token"})
 			return
 		}
+		
+		secure := config.GetString("COOKIE_SECURE", "false") == "true"
 
 		ctx.SetCookie(
 			"auth_token",
@@ -71,8 +73,8 @@ func UserRegister(s *store.UserStore, a *auth.JWTAuthenticator) gin.HandlerFunc 
 			3600 * 24 * 2,
 			"/",
 			"",
-			false,
-			true,	
+			secure,
+			true,
 		)
 
 		ctx.JSON(http.StatusCreated, ResponsePayload{
@@ -118,14 +120,17 @@ func UserLogin(s *store.UserStore, a *auth.JWTAuthenticator) gin.HandlerFunc {
 			return
 		}
 
+			
+		secure := config.GetString("COOKIE_SECURE", "false") == "true"
+
 		ctx.SetCookie(
 			"auth_token",
 			token,
 			3600 * 24 * 2,
 			"/",
 			"",
-			false,
-			true,	
+			secure,
+			true,
 		)
 
 		ctx.JSON(http.StatusOK, ResponsePayload{

@@ -1,0 +1,9 @@
+securityanalytics.duckdns.org {
+    handle /api/v1/* {
+        reverse_proxy dashboard:8081
+    }
+    handle {
+        reverse_proxy nuxt-dashboard:3000
+    }
+}
+

@@ -24,7 +24,7 @@ producer = Producer({
     "message.max.bytes": 5000000,
 })
 
-print(f"📡 Ingestor: reading from {CAMERA_URL} @ {FPS} FPS → topic {TOPIC}")
+# print(f"📡 Ingestor: reading from {CAMERA_URL} @ {FPS} FPS → topic {TOPIC}")
 
 interval = 1.0 / FPS
 base_backoff = 2
@@ -101,7 +101,7 @@ def run_camera(camera, stop_event):
 
             producer.poll(0)
 
-            print(f"▶️  Published frame to {TOPIC} ({camera['camera_id']})")
+            # print(f"▶️  Published frame to {TOPIC} ({camera['camera_id']})")
 
             elapsed = time.time() - t0
 
@@ -126,27 +126,28 @@ def main():
                 logging.error(f"failed to fetch cameras: {e}")
                 time.sleep(30)
                 continue
+            
+            if cameras is not None:
+                active_ids = {c["camera_id"] for c in cameras}
+                
+                for camera in cameras:
+                    if camera["camera_id"] not in threads:
+                        stop = threading.Event()
 
-            active_ids = {c["camera_id"] for c in cameras}
+                        t = threading.Thread(
+                            target=run_camera,
+                            args=(camera, stop),
+                            daemon=True,
+                        )
 
-            for camera in cameras:
-                if camera["camera_id"] not in threads:
-                    stop = threading.Event()
+                        threads[camera["camera_id"]] = (t, stop)
+                        t.start()
 
-                    t = threading.Thread(
-                        target=run_camera,
-                        args=(camera, stop),
-                        daemon=True,
-                    )
-
-                    threads[camera["camera_id"]] = (t, stop)
-                    t.start()
-
-            for camera_id in list(threads.keys()):
-                if camera_id not in active_ids:
-                    threads[camera_id][1].set()
-                    threads[camera_id][0].join()
-                    del threads[camera_id]
+                for camera_id in list(threads.keys()):
+                    if camera_id not in active_ids:
+                        threads[camera_id][1].set()
+                        threads[camera_id][0].join()
+                        del threads[camera_id]
 
             time.sleep(30)
 

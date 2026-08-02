@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig(event)
-  const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
+  const apiBase = config.apiInternal.replace(/\/$/, '')
 
   const upstream = await fetch(
     `${apiBase}/api/v1/alerts/${encodeURIComponent(alertId)}/image`,

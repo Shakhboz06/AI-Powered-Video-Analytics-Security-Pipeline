@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
-  const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
+  const apiBase = config.apiInternal.replace(/\/$/, '')
 
   const controller = new AbortController()
   event.node.req.on('close', () => controller.abort())
