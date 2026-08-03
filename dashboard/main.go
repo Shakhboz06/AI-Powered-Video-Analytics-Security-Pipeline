@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"strings"
-
 	"log"
 	"net"
 	"net/http"
