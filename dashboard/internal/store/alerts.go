@@ -101,9 +101,42 @@ func (s *AlertStore) GetAll(ctx context.Context, camera, status string) ([]Alert
 	return alerts, nil
 }
 
-// GetForStream returns every alert recorded for one stream (an uploaded
-// video's stream_id), oldest first and without the 24h dashboard window so
-// shared result links keep working.
+func (s *AlertStore) UpdateStatus(ctx context.Context, id int64, status string) (*Alerts, error) {
+
+	query := `
+		WITH updated AS (
+    	UPDATE alerts
+    	SET status = $2
+    	WHERE id = $1
+    	RETURNING id, alert_id, camera, zone_id, tracker_id, bound_box, label, status, recorded_at, alert_type, severity
+		)
+		SELECT u.id, u.alert_id, u.camera, u.zone_id, z.name AS zone_name,
+    		u.tracker_id, u.bound_box, u.label, u.status, u.recorded_at, u.alert_type, u.severity
+		FROM updated u
+		LEFT JOIN zones z ON u.zone_id = z.id;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var alert Alerts
+	var rowBoundBox []byte
+
+	err := s.db.QueryRowContext(ctx, query, id, status).
+	Scan(&alert.ID, &alert.AlertId, &alert.Camera, &alert.ZoneID, 
+	&alert.ZoneName, &alert.TrackerID, &rowBoundBox, &alert.Label, &alert.Status, 
+	&alert.RecordedAt, &alert.AlertType, &alert.Severity)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(rowBoundBox, &alert.BoundBox); err != nil {
+		return nil, err
+	}
+
+	return &alert, nil
+}
+
 func (s *AlertStore) GetForStream(ctx context.Context, camera string) ([]Alerts, error) {
 
 	query := `SELECT
@@ -160,8 +193,7 @@ func (s *AlertStore) GetForStream(ctx context.Context, camera string) ([]Alerts,
 	return alerts, nil
 }
 
-// AlertBelongsToStream guards the public alert-image endpoint against
-// enumerating frames from other cameras or jobs.
+
 func (s *AlertStore) AlertBelongsToStream(ctx context.Context, alertID, camera string) (bool, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -175,4 +207,3 @@ func (s *AlertStore) AlertBelongsToStream(ctx context.Context, alertID, camera s
 
 	return exists, err
 }
-
