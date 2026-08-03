@@ -5,16 +5,16 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig(event)
-  const apiBase = (config.public.apiBase as string).replace(/\/$/, '')
-  const apiKey = config.public.apiKey as string
+  const apiBase = config.apiInternal.replace(/\/$/, '')
 
   const upstream = await fetch(
     `${apiBase}/api/v1/alerts/${encodeURIComponent(alertId)}/image`,
     {
       headers: {
         Accept: 'application/json',
-        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+        Cookie: getRequestHeader(event, 'Cookie') ?? '',
       },
+      
     },
   )
 

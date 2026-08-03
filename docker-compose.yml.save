@@ -24,13 +24,10 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: '1'
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,TAILSCALE://0.0.0.0:39092,PUBLIC://0.0.0.0:39093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092,TAILSCALE://100.117.5.33:39092,PUBLIC://145.239.79.243:39093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,TAILSCALE:PLAINTEXT,PUBLIC:SASL_PLAINTEXT
-      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,TAILSCALE://0.0.0.0:39092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092,TAILSCALE://100.117.5.33:39092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,TAILSCALE:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_LISTENER_NAME_PUBLIC_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required user_worker="Shakhboz06";'
-      KAFKA_ZOOKEEPER_SASL_ENABLED: "false"
       KAFKA_MESSAGE_MAX_BYTES:       5000000
       KAFKA_REPLICA_FETCH_MAX_BYTES: 5000000
       KAFKA_FETCH_MAX_BYTES:         5000000
@@ -38,7 +35,6 @@ services:
       - "127.0.0.1:9092:9092"
       - "127.0.0.1:29092:29092"
       - "100.117.5.33:39092:39092"
-      - "39093:39093"
     depends_on:
       - zookeeper
     healthcheck:
@@ -91,18 +87,18 @@ services:
       postgres:
         condition: service_healthy
 
- # ingestor:
-  #  build:
-   #   context: ./ingestor
-    #  dockerfile: ingestor.dockerfile
+  #ingestor:
+    #build:
+      #context: ./ingestor
+      #dockerfile: ingestor.dockerfile
     #container_name: ingestor
-   # env_file:
-     # - .env
-    #volumes:
-    #- ./dev/videos:/videos
-    #depends_on:
-     # kafka:
-      #  condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+    - ./dev/videos:/videos
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   upload-ingestor:
     build:
@@ -135,32 +131,6 @@ services:
         condition: service_healthy
     ports:
       - "8081:8081"
-    
-  nuxt-dashboard:
-    build:
-      context: .
-      dockerfile: nuxt-dashboard/nuxt-dashboard.dockerfile
-    container_name: nuxt-dashboard
-    env_file:
-      - nuxt-dashboard/.env
-    depends_on:
-       - dashboard
-    restart: unless-stopped
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: caddy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - nuxt-dashboard
-      - dashboard
-    restart: unless-stopped
 
   notifier:
     build:
@@ -200,8 +170,6 @@ services:
 volumes:
   db-data:
   uploads-data:
-  caddy_data:
-  caddy_config:
 networks:
   default:
     driver: bridge

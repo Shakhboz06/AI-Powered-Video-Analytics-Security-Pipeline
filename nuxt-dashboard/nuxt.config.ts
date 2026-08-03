@@ -29,8 +29,9 @@ export default defineNuxtConfig({
     ],
   },
   runtimeConfig: {
+    apiInternal: process.env.NUXT_API_INTERNAL || 'http://dashboard:8081',
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8081',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || '',
       apiKey: process.env.NUXT_PUBLIC_API_KEY || '',
     },
   },

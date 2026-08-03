@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"video-analytics-pipe/dashboard/internal/auth"
 	"video-analytics-pipe/dashboard/internal/store"
-
+	"video-analytics-pipe/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -64,6 +64,18 @@ func UserRegister(s *store.UserStore, a *auth.JWTAuthenticator) gin.HandlerFunc 
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign token"})
 			return
 		}
+		
+		secure := config.GetString("COOKIE_SECURE", "false") == "true"
+
+		ctx.SetCookie(
+			"auth_token",
+			token,
+			3600 * 24 * 2,
+			"/",
+			"",
+			secure,
+			true,
+		)
 
 		ctx.JSON(http.StatusCreated, ResponsePayload{
 			User: UserPayload{
@@ -107,6 +119,19 @@ func UserLogin(s *store.UserStore, a *auth.JWTAuthenticator) gin.HandlerFunc {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "could not sign token"})
 			return
 		}
+
+			
+		secure := config.GetString("COOKIE_SECURE", "false") == "true"
+
+		ctx.SetCookie(
+			"auth_token",
+			token,
+			3600 * 24 * 2,
+			"/",
+			"",
+			secure,
+			true,
+		)
 
 		ctx.JSON(http.StatusOK, ResponsePayload{
 			User: UserPayload{
@@ -153,42 +178,3 @@ func LoginToDashboard(s *store.UserStore) gin.HandlerFunc {
 		})
 	}
 }
-
-// type UserCreds struct{
-// 	Username string `json:"username"`
-// 	Password string `json:"password"`
-// }
-
-// func UserLoginToDashboard() gin.HandlerFunc {
-// 	return func(ctx *gin.Context){
-// 		var creds UserCreds
-// 		if err := ctx.BindJSON(&creds); err != nil{
-// 			ctx.JSON(400, gin.H{"error": "invalid payload"})
-// 			return
-// 		}
-
-// 		if creds.Username == "admin" && creds.Password == "111111"{
-// 			token := "hardcodedjwtthenwillbereplacedwiththerealoneinprodcution123890"
-// 			ctx.JSON(http.StatusOK, gin.H{"token": token})
-// 		}else{
-// 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials" })
-// 		}
-// 	}
-// }
-
-// func UserRegister() gin.HandlerFunc {
-// 	return func(ctx *gin.Context){
-// 		var creds UserCreds
-// 		if err := ctx.BindJSON(&creds); err != nil{
-// 			ctx.JSON(400, gin.H{"error": "invalid payload"})
-// 			return
-// 		}
-
-// 		if creds.Username == "admin" && creds.Password == "111111"{
-// 			token := "hardcodedjwtthenwillbereplacedwiththerealoneinprodcution123890"
-// 			ctx.JSON(http.StatusOK, gin.H{"token": token})
-// 		}else{
-// 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials" })
-// 		}
-// 	}
-// }

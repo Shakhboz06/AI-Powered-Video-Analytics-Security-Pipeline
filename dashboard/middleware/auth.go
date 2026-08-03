@@ -24,14 +24,22 @@ func AuthByAPIKey(key string) gin.HandlerFunc {
 
 func AuthTokenMiddleware(s *store.UserStore, auth *auth.JWTAuthenticator) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		authHeader := ctx.GetHeader("Authorization")
-		if authHeader == "" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "not Authorized, missing credentials"})
-			return
+
+		var tokenStr string
+
+		if cookie, err := ctx.Cookie("auth_token"); err == nil && cookie != ""{
+			tokenStr = cookie
+		}else{
+			authHeader := ctx.GetHeader("Authorization")
+
+			if authHeader == "" {
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "not Authorized, missing credentials"})
+				return
+			}
+			
+			tokenStr = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
 		}
-
-		tokenStr := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-
+		
 		userID, token_ver, err := auth.ValidateToken(tokenStr)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 # Path to Docker‐Compose file
-Docker := docker-compose -f docker-compose.yml
+Docker := docker compose -f docker-compose.yml
 MIGRATIONS_PATH = ./db/migrate/
 DOCKER_MIGRATE = docker run --rm -v migrate-volume:/data --network="host" migrate/migrate:latest
 
