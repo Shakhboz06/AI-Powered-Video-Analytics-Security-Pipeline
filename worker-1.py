@@ -498,6 +498,10 @@ try:
             sweep_stale_streams()
             last_sweep = time.time()
 
+        if time.time() - last_sweep >= SWEEP_INTERVAL_S:
+            sweep_stale_streams()
+            last_sweep = time.time()
+
 except KeyboardInterrupt:
     pass
 finally:

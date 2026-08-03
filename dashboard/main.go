@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 
 	"log"
 	"net"
@@ -25,6 +26,28 @@ import (
 	"github.com/segmentio/kafka-go"
 	"golang.org/x/sync/errgroup"
 )
+
+const uploadsTopic = "video.uploads"
+
+// ensureUploadsTopic creates the upload-jobs topic if it does not exist yet;
+// auto topic creation is disabled on the broker.
+func ensureUploadsTopic(broker string) {
+	conn, err := kafka.Dial("tcp", broker)
+	if err != nil {
+		log.Printf("⚠️  could not dial kafka to ensure %s topic: %v", uploadsTopic, err)
+		return
+	}
+	defer conn.Close()
+
+	err = conn.CreateTopics(kafka.TopicConfig{
+		Topic:             uploadsTopic,
+		NumPartitions:     1,
+		ReplicationFactor: 1,
+	})
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		log.Printf("⚠️  could not create %s topic: %v", uploadsTopic, err)
+	}
+}
 
 func main() {
 
@@ -152,7 +175,7 @@ func main() {
 
 		type ServiceCheck struct {
 			Service string `json:"service"`
-			Status  string `json:status`
+			Status  string `json:"status"`
 			Err     string `json:"error,omitempty"`
 		}
 
