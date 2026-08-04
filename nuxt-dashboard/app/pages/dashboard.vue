@@ -6,6 +6,8 @@
       subtitle="Real-time detection feed, camera health, and class distribution across your fleet."
     />
 
+    <ServiceHoursNotice />
+
     <section class="grid gap-3 sm:grid-cols-2">
       <KpiCard
         label="Cameras online"
@@ -110,6 +112,7 @@ import LiveSnapshotCard from '~/components/security/LiveSnapshotCard.vue'
 import ClassDonutChart from '~/components/security/ClassDonutChart.vue'
 import CameraStatusList from '~/components/security/CameraStatusList.vue'
 import PageHeader from '~/components/ui/PageHeader.vue'
+import ServiceHoursNotice from '~/components/ServiceHoursNotice.vue'
 import FilterToolbar from '~/components/ui/FilterToolbar.vue'
 import KpiCard from '~/components/ui/KpiCard.vue'
 import type { CameraStatusRow, SecurityZone } from '~/types/security'
