@@ -29,26 +29,23 @@ import (
 
 func main() {
 
-	// ─── Load config ──────────────────────────────────────────────
 	jwtSecret := config.GetString("AUTH_TOKEN_SECRET", "")
 	jwtAud := config.GetString("AUTH_JWT_AUD", "video-dashboard")
 	jwtIss := config.GetString("AUTH_JWT_ISS", "video-dashboard")
 	jwtExp := time.Hour * 2 * 24
 
-	// Create the JWT authenticator
 	jwtAuth := auth.NewJWTAuthenticator(jwtSecret, jwtAud, jwtIss, jwtExp)
 
-	// ─── Load configuration ───────────────────────
 	addr := config.GetString("DASHBOARD_API_ADDR", "")
 
-	// ────────────   Redis  Caching   ───────────
+
 	redisAddr := config.GetString("REDIS_URL", "")
 	redisPass := config.GetString("REDIS_PASS", "")
 	redisDB := config.GetInt("REDIS_DB", 0)
 
 	rdb := cache.NewRedisClient(redisAddr, redisPass, redisDB)
 	cache.NewRedisStorage(rdb)
-	// ─── Router setup ─────────────────────────────
+
 	apiKey := config.GetString("AUTH_API_KEY", "")
 
 	r := gin.Default()
