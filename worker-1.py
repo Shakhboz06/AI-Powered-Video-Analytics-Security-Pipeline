@@ -12,7 +12,6 @@ from pytorchvideo.models.hub import i3d_r50
 from supabase import create_client, Client
 
 
-# ─── Load environment ──────────────────────────────────────────────────────────────
 load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
 BROKER       = os.getenv("KAFKA_BROKER", "kafka:9092")
 ANALYSIS_T   = os.getenv("KAFKA_ANALYSIS_TOPIC",  "video.analysis")
@@ -27,7 +26,6 @@ FIGHT_MODEL = os.getenv("FIGHT_MODEL_PATH", "models/fight_detector_v2.pt")
 POSE_MODEL= os.getenv("POSE_MODEL_PATH", "models/yolo26m-pose.pt")
 UPLOAD_EVIDENCE_WINDOW_MS=int(os.getenv("UPLOAD_EVIDENCE_WINDOW_MS", "30000"))
 
-# ─── Kafka setup ───────────────────────────────────────────────────────────────────
 frame_consumer = Consumer({
     "bootstrap.servers": BROKER,
     "group.id":          GROUP_ID,
@@ -94,11 +92,6 @@ class FightDetectorModel:
         self.std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1, 1).to(self.device)
     
     def predict(self, frames_array):
-        """
-        frames_array: numpy array shape (N, H, W, 3), uint8
-        Returns: fight probability (float)
-        """
-        # Sample 32 evenly-spaced frames if more than 32
         n = len(frames_array)
         if n < 32:
 
@@ -130,7 +123,6 @@ class FightDetectorModel:
         return fight_prob
 
 
-# ─── Frame processing function ────────────────────────────────────────────────────
 detection_model = YOLO(DETECTION_MODEL).to(device)
 pose_model= YOLO(POSE_MODEL).to(device)
 weapon_model=YOLO(WEAPON_MODEL).to(device)
@@ -146,10 +138,8 @@ else:
 fall_model.load_state_dict(fall_state_dict)
 fall_model.eval()
 
-print(f"Loaded fall detection model from {FALL_MODEL}")
 
 fight_model = FightDetectorModel(FIGHT_MODEL, device=device)
-print(f"Loaded fight detection model from {FIGHT_MODEL}")
 
 
 tracker = sv.ByteTrack()
@@ -165,7 +155,6 @@ last_inference_time = defaultdict(int)
 EVIDENCE_WINDOW_MS = 4000
 evidence_buffers = defaultdict(lambda: deque())
 
-# ─── Per-stream state sweep ───────────────────────────────────────────────
 last_seen = {}
 STATE_TTL_S = 600
 SWEEP_INTERVAL_S = 60
@@ -182,7 +171,6 @@ def sweep_stale_streams():
         frame_buffers.pop(sid, None)
         last_inference_time.pop(sid, None)
         evidence_buffers.pop(sid, None)
-        print(f"🧹 swept per-stream state for idle stream {sid}")
 
 
 
@@ -193,8 +181,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         return {"detections": [], "latency_ms": 0.0}
-
-    print(f"🔍 decoded image shape: {img.shape}")
 
     start = time.time()
     results = detection_model.predict(img, conf=0.25)
@@ -329,7 +315,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
 
         keypoint_history[stream_id][tracker_id].append(kyp_norm)
 
-        # print("keypoints:shape:", kyp_norm.shape)   
 
     fall_predictions = {}
 
@@ -362,7 +347,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
         frame_buffers[stream_id].popleft()
 
     frame_buffers[stream_id].append((timestamp, small_frame))
-    print(f"BUFFER: {stream_id} len={len(frame_buffers[stream_id])} ts={timestamp} since_last_inf={timestamp - last_inference_time[stream_id]}")
 
     fight_predictions = None
     if timestamp - last_inference_time[stream_id] >= 2000 and len(frame_buffers[stream_id]) >= MIN_FRAMES:
@@ -370,7 +354,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
         buffer_array = np.array(frames_only)
         fight_predictions = fight_model.predict(buffer_array)
         last_inference_time[stream_id] = timestamp
-        print(f"FIGHT INFO: {stream_id} buf={len(buffer_array)} pred={fight_predictions:.4f}")
 
     return {
         "detections": list_det,
@@ -417,8 +400,6 @@ def iou(box1, box2):
     
     return intersection / union if union > 0 else 0
 
-
-# ─── Main loop ─────────────────────────────────────────────────────────────────────
 try:
     while True:
         msg = frame_consumer.poll(1.0)
@@ -452,10 +433,7 @@ try:
             payload = json.dumps(output).encode("utf-8")
             producer.produce(RESULTS_T, payload)
             producer.flush()
-                             
-            print(f"{output['camera']} → detections={res['detections']} →  keypoints={res['keypoints']} → fall_predictions={res['fall_predictions']} → fight_predictions={res['fight_predictions']} → "
-                f"latency={res['latency_ms']:.1f}ms")
-            
+                                         
         while True:    
             alert_msg = alert_consumer.poll(0.0)
             if alert_msg is None: 
@@ -491,8 +469,6 @@ try:
                     except Exception as e:
                         print("Upload failed:", e)
 
-
-                    print(f"alert {data['alert_id']}: requested {data['timestamp']}, matched {result[0]}, diff {abs(result[0]-data['timestamp'])}ms, saved {filename}")
 
         if time.time() - last_sweep >= SWEEP_INTERVAL_S:
             sweep_stale_streams()
