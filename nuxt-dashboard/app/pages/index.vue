@@ -206,7 +206,7 @@
           <p>&copy; {{ year }} Security Ops &middot; Video Analytics Platform</p>
           <span class="inline-flex items-center gap-1 rounded-full border border-teal-500/20 bg-teal-950/30 px-2.5 py-0.5 text-[11px] font-medium text-teal-300">
             <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-            Built with Security
+            Built for Privacy
           </span>
         </div>
         <div class="flex items-center gap-5">
