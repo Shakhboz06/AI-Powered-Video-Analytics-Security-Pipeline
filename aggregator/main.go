@@ -108,7 +108,6 @@ func main() {
 
 	defer writer.Close()
 
-	// ─── Kafka reader from video.results ───────────────────
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{broker},
 		Topic:   "video.results",
@@ -117,7 +116,7 @@ func main() {
 
 	log.Println("▶️  Aggregator listening on video.results …")
 	defer reader.Close()
-	// ─── TimeSeriesDB  ────────────────────────────────────
+
 	database, err := postgres.New()
 	if err != nil {
 		panic("failed to connect to database: " + err.Error())
@@ -269,7 +268,6 @@ func main() {
 				alertIntrusion := intrusionState.UpdateState(currentMap, zoneByID, detections.RecordedAt)
 				for _, a := range alertIntrusion {
 					alerts = append(alerts, a)
-					log.Printf("🚨 NEW INTRUSION: tracker #%d entered zone %d camera %s bound_box %v label %s recorded_at %v alert_type %s", a.TrackerID, a.ZoneID, a.Camera, a.BoundBox, a.Label, a.RecordedAt, a.AlertType)
 				}
 			}
 
@@ -348,7 +346,6 @@ func main() {
 			fightingAlerts := fightingDetector.DetectFight(det.Camera, det.Detections, det.FightPredictions, detections.RecordedAt)
 			if fightingAlerts != nil {
 				alerts = append(alerts, *fightingAlerts)
-				log.Printf("fighting alert: %v", fightingAlerts)
 			}
 
 			brandishingAlerts := brandishingDetector.DetectBrandishing(det.Camera, det.Detections, det.Keypoints, detections.RecordedAt)
@@ -396,9 +393,6 @@ func main() {
 
 			cancel()
 
-
-			log.Printf("Wrote to TimeSeriesDB: %s lat=%.1fms",
-				det.Camera, det.LatencyMS,
 			)
 		}
 	}
