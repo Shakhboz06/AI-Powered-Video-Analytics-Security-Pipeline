@@ -24,8 +24,6 @@ producer = Producer({
     "message.max.bytes": 5000000,
 })
 
-# print(f"📡 Ingestor: reading from {CAMERA_URL} @ {FPS} FPS → topic {TOPIC}")
-
 interval = 1.0 / FPS
 base_backoff = 2
 max_backoff = 10
@@ -100,8 +98,6 @@ def run_camera(camera, stop_event):
             )
 
             producer.poll(0)
-
-            # print(f"▶️  Published frame to {TOPIC} ({camera['camera_id']})")
 
             elapsed = time.time() - t0
 
