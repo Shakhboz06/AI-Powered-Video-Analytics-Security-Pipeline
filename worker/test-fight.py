@@ -45,22 +45,21 @@ def extract_clip_evenly_spaced(video_path, num_samples=32, size=224):
 
 
 MODEL_PATH = "models/fight_detector_v2.pt"
-TEST_VIDEO = "C:/Users/shakh/OneDrive/Desktop/video-analytics-pipeline/dev/videos/yt_bankmt-Fight.mp4"
+TEST_VIDEO = "path/to/test"
 
 THRESHOLD = 0.6
 
-# Load model
 fight_model = create_fight_model()
 checkpoint = torch.load(MODEL_PATH, map_location='cpu')
 fight_model.load_state_dict(checkpoint['model_state_dict'])
 fight_model.eval()
 print(f"Loaded fight model (val_acc: {checkpoint['val_acc']:.4f})")
 
-# Extract clip same way as training
+
 clip_array = extract_clip_evenly_spaced(TEST_VIDEO)
 print(f"Clip shape: {clip_array.shape}")
 
-# Preprocess same as Dataset class
+
 clip = torch.from_numpy(clip_array).float() / 255.0
 clip = clip.permute(3, 0, 1, 2)
 mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1, 1)
@@ -68,7 +67,7 @@ std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1, 1)
 clip = (clip - mean) / std
 clip = clip.unsqueeze(0)
 
-# Inference
+
 with torch.no_grad():
     output = fight_model(clip)
     probs = torch.softmax(output, dim=1)
@@ -81,6 +80,6 @@ print(f"NonFight probability: {nonfight_prob:.4f}")
 print(f"Fight probability:    {fight_prob:.4f}")
 
 if fight_prob > THRESHOLD:
-    print(f"🚨 FIGHT DETECTED (confidence: {fight_prob:.2f})")
+    print(f"FIGHT DETECTED (confidence: {fight_prob:.2f})")
 else:
-    print(f"✓ No fight detected")
+    print(f"No fight detected")
