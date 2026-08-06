@@ -13,7 +13,7 @@ func ensureUploadsTopic(broker string) {
 
 	conn, err := kafka.Dial("tcp", broker)
 	if err != nil {
-		log.Printf("⚠️  could not dial kafka to ensure %s topic: %v", uploadsTopic, err)
+		log.Printf("could not dial kafka to ensure %s topic: %v", uploadsTopic, err)
 		return
 	}
 	defer conn.Close()
@@ -24,6 +24,6 @@ func ensureUploadsTopic(broker string) {
 		ReplicationFactor: 1,
 	})
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		log.Printf("⚠️  could not create %s topic: %v", uploadsTopic, err)
+		log.Printf("could not create %s topic: %v", uploadsTopic, err)
 	}
 }
