@@ -35,8 +35,6 @@ frame_consumer.subscribe([ANALYSIS_T])
 
 producer = Producer({"bootstrap.servers": BROKER})
 
-print(f"Listening on {ANALYSIS_T}, producing to {RESULTS_T}")
-
 alert_consumer = Consumer({
     "bootstrap.servers": BROKER,
     "group.id": ALERT_GROUP_ID,
@@ -187,8 +185,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
 
     detections = sv.Detections.from_ultralytics(results[0])
     detections = tracker.update_with_detections(detections)
-    
-    cv2.imwrite(f"/tmp/debug_frame_{stream_id}.jpg", img)
     
     ok, buf = cv2.imencode(".jpg", img)
     if not ok:
