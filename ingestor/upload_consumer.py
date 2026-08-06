@@ -56,8 +56,6 @@ def process_job(job):
     stream_id = job["stream_id"]
     path = job["path"]
 
-    print(f"▶️  job {job_id}: analyzing {path} as stream {stream_id}")
-
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
         report(job_id, "failed", 0, error="could not open the uploaded video")
@@ -74,9 +72,6 @@ def process_job(job):
     skip_ratio = max(source_fps / PUBLISH_FPS, 1.0)
     skip_accum = 0.0
 
-    # Frame timestamps are anchored at "now" and advance in video time, so
-    # the worker's time-windowed models (fight buffer) behave as if the
-    # video were live while analysis itself runs as fast as the worker can.
     base_ms = int(time.time() * 1000)
 
     report(job_id, "processing", 0)
@@ -145,7 +140,7 @@ def process_job(job):
         return
 
     report(job_id, "finalizing", 99, last_frame_ms=last_ts)
-    print(f"✅ job {job_id}: published {published} frames, awaiting worker to finish")
+    print(f"job {job_id}: published {published} frames, awaiting worker to finish")
 
     if not KEEP_FILES:
         try:
@@ -153,8 +148,6 @@ def process_job(job):
         except OSError as e:
             print(f"could not remove {path}: {e}")
 
-
-print(f"Upload ingestor listening on {UPLOADS_TOPIC} → {ANALYSIS_T} at {PUBLISH_FPS} fps")
 
 try:
     while True:
