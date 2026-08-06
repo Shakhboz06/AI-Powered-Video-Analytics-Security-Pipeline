@@ -68,10 +68,7 @@ func (s *JobStore) GetByJobID(ctx context.Context, jobID string) (*AnalysisJob, 
 	return &job, nil
 }
 
-// UpdateProgress is called by the upload ingestor while it streams frames
-// into the pipeline. started_at is stamped on the first "processing" update
-// and last_frame_at records the timestamp of the final published frame so
-// completion can be detected against the detections written by the worker.
+
 func (s *JobStore) UpdateProgress(ctx context.Context, jobID, status string, progress int, errMsg *string, lastFrameAt *time.Time) error {
 
 	query := `
@@ -104,10 +101,7 @@ func (s *JobStore) UpdateProgress(ctx context.Context, jobID, status string, pro
 	return nil
 }
 
-// FinalizeIfComplete flips a "finalizing" job to "done" once the worker has
-// caught up: the newest detection row for the job's stream has reached the
-// timestamp of the last ingested frame (with a small tolerance). A stale
-// fallback marks the job done anyway so a link never spins forever.
+
 func (s *JobStore) FinalizeIfComplete(ctx context.Context, job *AnalysisJob) error {
 
 	if job.Status != "finalizing" {
@@ -134,7 +128,6 @@ func (s *JobStore) FinalizeIfComplete(ctx context.Context, job *AnalysisJob) err
 		}
 	}
 
-	// Fallback: worker lag should never hold a shared link hostage.
 	if !done && time.Since(job.UpdatedAt) > 10*time.Minute {
 		done = true
 	}
