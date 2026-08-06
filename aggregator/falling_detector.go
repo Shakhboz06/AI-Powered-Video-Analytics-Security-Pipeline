@@ -163,19 +163,6 @@ func checkFalling(camera string, st *PerPersonFallState, bbox [4]float64, kyp Ke
 
 	fallenStateNow := signals >= 2
 
-	log.Printf(
-		"... ratio=%.2f yVar=%.2f normVar=%.2f velocity=%.2f signals=%d bboxSignal=%v keypointSignal=%v velocitySignal=%v fallenStateNow=%v ...",
-		currentRatio,
-		yVariance,
-		normalizedVariance,
-		velocity,
-		signals,
-		bboxRatioSignal,
-		keypointVarianceSignal,
-		velocitySignal,
-		fallenStateNow,
-	)
-
 	if fallenStateNow {
 		st.ConfirmationCount++
 	} else {
@@ -233,7 +220,6 @@ func extractHeadY(kyp Keypoints) (float64, bool) {
 		return y, true
 	}
 
-	log.Printf("[HEAD DEBUG] nose_conf=%.2f, shoulder_l_conf=%.2f, shoulder_r_conf=%.2f, returning_ok=%v", 
     kyp.Points.Conf[0], kyp.Points.Conf[5], kyp.Points.Conf[6])
 
 	return 0, false
