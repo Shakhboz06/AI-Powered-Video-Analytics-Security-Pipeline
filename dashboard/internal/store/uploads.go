@@ -37,8 +37,7 @@ func (s *UploadStore) Create(ctx context.Context, jobID, filename string) error 
 	return err
 }
 
-// UpdateStatus moves a job through its lifecycle; completed_at is stamped
-// when the job reaches a terminal state ('done' or 'failed').
+
 func (s *UploadStore) UpdateStatus(ctx context.Context, jobID, status string) error {
 
 	query := `
