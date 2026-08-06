@@ -6,5 +6,3 @@ CREATE TABLE IF NOT EXISTS upload_jobs(
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ
 );
-
--- job_id is indexed by its UNIQUE constraint; no extra index needed.
