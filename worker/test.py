@@ -24,7 +24,7 @@ checkpoint = torch.load("models/fall_classifier_v1.pt")
 fall_model.load_state_dict(checkpoint['model_state_dict'])
 fall_model.eval()
 
-TEST_VIDEO = "C:/Users/shakh/OneDrive/Desktop/video-analytics-pipeline/dev/videos/falling_courier.mp4"
+TEST_VIDEO = "path/to/test"
 OUTPUT_DIR = "fall_detections"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -66,7 +66,6 @@ while True:
                 bbox = boxes[person_idx]
                 detections_this_frame.append((person_idx, bbox, prob))
     
-    # Draw boxes for all detected persons
     for person_idx, bbox, prob in detections_this_frame:
         x1, y1, x2, y2 = bbox.astype(int)
         
@@ -82,7 +81,6 @@ while True:
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
         cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
     
-    # Save frame if ANY person is detected as fallen
     any_fall = any(prob > THRESHOLD for _, _, prob in detections_this_frame)
     if any_fall:
         cv2.imwrite(f"{OUTPUT_DIR}/frame_{frame_idx:04d}.jpg", frame)
@@ -91,4 +89,3 @@ while True:
     frame_idx += 1
 
 cap.release()
-print(f"Done. Detections in {OUTPUT_DIR}/")
