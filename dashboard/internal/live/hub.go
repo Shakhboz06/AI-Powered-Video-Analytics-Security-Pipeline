@@ -24,17 +24,10 @@ func NewHub() *Hub {
 
 func (h *Hub) Subscribe(cam string) chan []byte {
 
-	//buffered, not unbuffered. make(chan []byte, 2) not make(chan []byte).
-	//The buffer is what makes "drop if slow" possible later: Broadcast's non-blocking send fills the buffer,
-	// and only drops when it's full. An unbuffered channel would drop every frame unless a reader is waiting at the exact instant — useless here.
-	// The buffer size is the knob: 2–4 frames.
-	//buffer_size is set to 1 here.
+	
 	ch := make(chan []byte, 1)
 
-	// writing to the map (adding a channel, maybe creating a set).
-	// That's a mutation, so it needs the exclusive write lock, even though it feels quick.
-	// RLock is only for Broadcast, which reads. defer unlock() right after locking is the clean
-	// Go habit — you can't forget to release it.
+	
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -50,7 +43,6 @@ func (h *Hub) Subscribe(cam string) chan []byte {
 
 func (h *Hub) UnSubcribe(cam string, channel chan []byte) {
 
-	// just deletetion operation overall this operation
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -113,8 +105,6 @@ func (h *Hub) Run() {
 
 		for cam, frame := range latest {
 			h.Broadcast(cam, frame)
-			// log.Printf("broadcast %s (%d bytes)", cam, len(frame))
-
 		}
 	}
 
