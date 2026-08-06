@@ -10,7 +10,6 @@ import torch.nn as nn
 from collections import defaultdict, deque
 from pytorchvideo.models.hub import i3d_r50
 
-# ─── Load environment ──────────────────────────────────────────────────────────────
 load_dotenv(os.path.join(os.path.dirname(__file__), "../.env"))
 BROKER       = os.getenv("KAFKA_BROKER", "kafka:9092")
 ANALYSIS_T   = os.getenv("KAFKA_ANALYSIS_TOPIC",  "video.analysis")
@@ -21,7 +20,8 @@ WEAPON_MODEL = os.getenv("WEAPON_MODEL_PATH", "models/weapons.pt")
 FALL_MODEL = os.getenv("FALL_MODEL_PATH", "models/fall_classifier_v1.pt")
 FIGHT_MODEL = os.getenv("FIGHT_MODEL_PATH", "models/fight_detector_v2.pt")
 POSE_MODEL= os.getenv("POSE_MODEL_PATH", "/models/yolo11n-pose.pt")
-# ─── Kafka setup ───────────────────────────────────────────────────────────────────
+
+
 consumer = Consumer({
     "bootstrap.servers": BROKER,
     "group.id":          GROUP_ID,
@@ -30,9 +30,6 @@ consumer = Consumer({
 consumer.subscribe([ANALYSIS_T])
 
 producer = Producer({"bootstrap.servers": BROKER})
-
-print(f"Listening on {ANALYSIS_T}, producing to {RESULTS_T}")
-
 
 def decode_header(headers, key):
     val = None
@@ -59,12 +56,10 @@ class FightDetectorModel:
     def __init__(self, model_path, device='cpu'):
         self.device = torch.device(device)
         
-        # Build architecture
         model = i3d_r50(pretrained=False)
         in_features = model.blocks[-1].proj.in_features
         model.blocks[-1].proj = nn.Linear(in_features, 2)
         
-        # Load trained weights
         checkpoint = torch.load(model_path, map_location=self.device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
@@ -72,16 +67,10 @@ class FightDetectorModel:
         
         self.model = model
         
-        # Normalization tensors (precomputed)
         self.mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1, 1).to(self.device)
         self.std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1, 1).to(self.device)
     
     def predict(self, frames_array):
-        """
-        frames_array: numpy array shape (N, H, W, 3), uint8
-        Returns: fight probability (float)
-        """
-        # Sample 32 evenly-spaced frames if more than 32
         n = len(frames_array)
         if n < 32:
             # Pad with last frame
@@ -89,7 +78,7 @@ class FightDetectorModel:
         else:
             indices = np.linspace(0, n-1, 32).astype(int).tolist()
         
-        # Take selected frames and resize
+
         selected = []
         for idx in indices:
             frame = frames_array[idx]
@@ -99,7 +88,7 @@ class FightDetectorModel:
         
         clip = np.array(selected, dtype=np.uint8)  # (32, 224, 224, 3)
         
-        # To tensor
+
         clip = torch.from_numpy(clip).float().to(self.device) / 255.0
         clip = clip.permute(3, 0, 1, 2)  # (C, T, H, W)
         clip = (clip - self.mean) / self.std
@@ -112,20 +101,18 @@ class FightDetectorModel:
         
         return fight_prob
 
-# ─── Frame processing function ────────────────────────────────────────────────────
+
 detection_model = YOLO(DETECTION_MODEL)
 pose_model= YOLO(POSE_MODEL)
 weapon_model=YOLO(WEAPON_MODEL)
 
-# Fall Classifier
 fall_model = FallDetectorModel()
 checkpoint = torch.load(FALL_MODEL)
 fall_model.load_state_dict(checkpoint['model_state_dict'])
 fall_model.eval()
-print(f"Loaded fall detection model from {FALL_MODEL}")
+
 
 fight_model = FightDetectorModel(FIGHT_MODEL, device='cpu')
-print(f"Loaded fight detection model from {FIGHT_MODEL}")
 
 
 tracker = sv.ByteTrack()
@@ -135,10 +122,7 @@ keypoint_history = defaultdict(lambda: defaultdict(lambda: deque(maxlen=30)))
 frame_buffers = defaultdict(lambda: deque())
 last_inference_time = defaultdict(int)
 
-# ─── Per-stream state sweep ───────────────────────────────────────────────
-# Upload jobs create a stream per job_id; once a job finishes its state
-# would linger forever (same leak as long-gone live cameras). Age-based
-# sweep drops everything for streams silent longer than STATE_TTL_S.
+
 last_seen = {}
 STATE_TTL_S = 600
 SWEEP_INTERVAL_S = 60
@@ -154,7 +138,7 @@ def sweep_stale_streams():
         keypoint_history.pop(sid, None)
         frame_buffers.pop(sid, None)
         last_inference_time.pop(sid, None)
-        print(f"🧹 swept per-stream state for idle stream {sid}")
+        print(f"swept per-stream state for idle stream {sid}")
 
 def process_frame(frame_bytes, stream_id, timestamp):
 
@@ -164,8 +148,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
     if img is None:
         return {"detections": [], "latency_ms": 0.0}
 
-    print(f"🔍 decoded image shape: {img.shape}")
-
     start = time.time()
     results = detection_model.predict(img, conf=0.25)
     # results = detection_model.predict(img, conf=0.10)
@@ -174,10 +156,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
     detections = tracker.update_with_detections(detections)
     
     cv2.imwrite(f"/tmp/debug_frame_{stream_id}.jpg", img)
-
-    print(f"Shape: {img.shape}, dtype: {img.dtype}")
-    print(f"Min/max: {img.min()}/{img.max()}")
-    print(f"Mean per channel: {img.mean(axis=(0,1))}")
 
     list_det = []
     
@@ -201,7 +179,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
     weapon_results = weapon_model.predict(img, conf=0.4, verbose=False, save=False)
 
     for r in weapon_results:
-        print("weapon_detections: ", r.boxes)
 
         
     keypoints = []
@@ -290,8 +267,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
         kyp_norm = np.column_stack(kyp_arr)
 
         keypoint_history[stream_id][tracker_id].append(kyp_norm)
-
-        print("keypoints:shape:", kyp_norm.shape)   
         
 
     fall_predictions = {}
@@ -308,7 +283,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
         
         
         sequence = np.array(list(history))  
-        print("sequence:", sequence)
         sequence = sequence.reshape(30, -1) 
         sequence_tensor = torch.FloatTensor(sequence).unsqueeze(0)
         
@@ -329,7 +303,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
         frame_buffers[stream_id].popleft()
 
     frame_buffers[stream_id].append((timestamp, small_frame))
-    print(f"BUFFER: {stream_id} len={len(frame_buffers[stream_id])} ts={timestamp} since_last_inf={timestamp - last_inference_time[stream_id]}")
 
     fight_predictions = None
     if timestamp - last_inference_time[stream_id] >= 2000 and len(frame_buffers[stream_id]) >= MIN_FRAMES:
@@ -337,7 +310,6 @@ def process_frame(frame_bytes, stream_id, timestamp):
         buffer_array = np.array(frames_only)
         fight_predictions = fight_model.predict(buffer_array)
         last_inference_time[stream_id] = timestamp
-        print(f"FIGHT INFO: {stream_id} buf={len(buffer_array)} pred={fight_predictions:.4f}")
 
 
     # if frame_counters[stream_id] % FIGHT_INFERENCE_INTERVAL == 0 and len(frame_buffers[stream_id]) >= 32:
@@ -371,7 +343,6 @@ def iou(box1, box2):
     return intersection / union if union > 0 else 0
 
 
-# ─── Main loop ─────────────────────────────────────────────────────────────────────
 try:
     while True:
         msg = consumer.poll(1.0)
@@ -407,9 +378,6 @@ try:
         producer.produce(RESULTS_T, payload)
         producer.flush()
                                                                 
-        print(f"{output['camera']} → detections={res['detections']} →  keypoints={res['keypoints']} → fall_predictions={res['fall_predictions']} → fight_predictions={res['fight_predictions']} → "
-              f"latency={res['latency_ms']:.1f}ms")
-
         if time.time() - last_sweep >= SWEEP_INTERVAL_S:
             sweep_stale_streams()
             last_sweep = time.time()
