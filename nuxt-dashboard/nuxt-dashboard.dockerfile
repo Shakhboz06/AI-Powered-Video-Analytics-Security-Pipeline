@@ -1,4 +1,3 @@
-# ---- Build stage ----
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY nuxt-dashboard/package.json nuxt-dashboard/package-lock.json ./
@@ -6,7 +5,6 @@ RUN npm ci
 COPY nuxt-dashboard/ ./
 RUN npm run build
 
-# ---- Runtime stage ----
 FROM node:22-alpine
 WORKDIR /app
 COPY --from=builder /app/.output ./.output
