@@ -27,7 +27,9 @@
         </p>
       </div>
 
-      <div class="mt-10 app-card p-6 md:p-8">
+      <ServiceHoursNotice class="mt-8" />
+
+      <div class="mt-4 app-card p-6 md:p-8">
         <!-- Dropzone -->
         <div
           v-if="!uploading"
@@ -111,6 +113,7 @@
 <script setup lang="ts">
 import AppBrand from '~/components/ui/AppBrand.vue'
 import AmbientMesh from '~/components/ui/AmbientMesh.vue'
+import ServiceHoursNotice from '~/components/ServiceHoursNotice.vue'
 
 definePageMeta({ layout: false })
 
