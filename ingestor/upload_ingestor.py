@@ -1,11 +1,3 @@
-"""Job-driven twin of ingestor.py for self-serve uploads.
-
-Consumes video.upload_jobs ({job_id, video_url}), streams the video's frames
-into video.analysis with stream_id = job_id — which scopes every detection
-and alert downstream to the upload — and reports job status back through the
-dashboard API. The live env-var ingestor stays untouched; this runs alongside.
-"""
-
 import json
 import os
 import tempfile
@@ -38,7 +30,6 @@ producer = Producer({"bootstrap.servers": BROKER})
 
 
 def get_job_status(job_id):
-    """Idempotency guard — Kafka can redeliver; only 'queued' jobs get processed."""
     try:
         resp = httpx.get(f"{DASHBOARD_API}/api/uploads/{job_id}", timeout=5.0)
         if resp.status_code != 200:
@@ -65,8 +56,7 @@ def set_job_status(job_id, status):
 
 
 def open_video(video_url):
-    """OpenCV opens HTTP URLs directly; fall back to a temp-file download
-    when the local build lacks ffmpeg/HTTP support. Returns (cap, temp_path)."""
+  
     cap = cv2.VideoCapture(video_url)
     if cap.isOpened():
         return cap, None
@@ -100,14 +90,10 @@ def process_job(job_id, video_url):
 
     cap, temp_path = open_video(video_url)
 
-    # Same frame loop as the live ingestor: FPS skip, wall-clock timestamps,
-    # real-time pacing — but stream_id = job_id and no loop-on-end.
     interval = 1.0 / FPS
     source_fps = cap.get(cv2.CAP_PROP_FPS)
     skip_ratio = (source_fps / FPS) if source_fps > 0 else 1.0
     skip_accum = 0.0
-
-    print(f"job {job_id}: source_fps={source_fps}, publish_fps={FPS}, skip_ratio={skip_ratio:.2f}")
 
     frames = 0
     try:
@@ -121,7 +107,6 @@ def process_job(job_id, video_url):
 
             ok, frame = cap.read()
             if not ok:
-                # end of file — done, don't rewind
                 break
 
             ok, buf = cv2.imencode(".jpg", frame)
@@ -151,10 +136,6 @@ def process_job(job_id, video_url):
     if frames == 0:
         raise RuntimeError("no readable frames in the video")
 
-    print(f"job {job_id}: published {frames} frames")
-
-
-print(f"Upload ingestor listening on {JOBS_TOPIC} → {ANALYSIS_T} at {FPS} fps")
 
 try:
     while True:
@@ -182,11 +163,10 @@ try:
         try:
             process_job(job_id, video_url)
             set_job_status(job_id, "done")
-            print(f"✅ job {job_id} done")
         except Exception as e:
             # jobs must never hang in 'processing' forever
             set_job_status(job_id, "failed")
-            print(f"❌ job {job_id} failed: {e}")
+            print(f"job {job_id} failed: {e}")
 
 except KeyboardInterrupt:
     pass
