@@ -88,15 +88,23 @@ The system is built as independent services communicating through a message queu
 
 ## Status & limitations
 
-This is a **working prototype**, not a production product.
+This is a **working prototype**, not a production product. The infrastructure is proven end-to-end; model accuracy is the ongoing work.
 
 - Live analysis is available **Mon–Fri, 10:00–16:00 (Berlin time)** — the GPU is scheduled to control cost. Outside these hours, uploads return no results.
 - Detector accuracy is at prototype stage: models are trained largely on public datasets, so real-world false positives (and misses) still occur and are an ongoing tuning effort. This is the normal data-and-tuning long game of the field, not a limit of the architecture.
 - Infrastructure is proven; accuracy is the undergoing long-term priority roadmap.
 
+**Model limitations (honest state)**
+- **Weapon detection** performs best in conditions close to its training data. Small, partially hidden, or oddly angled weapons — and low light or cluttered outdoor scenes — reduce accuracy.
+- **Fighting detection** is the least mature model: it needs two or more people in frame to be meaningful and still requires score smoothing and further training to be reliable.
+- **Fall detection** handles clear falls well but can be confused by occluded lower bodies and unusual postures; it detects the *falling motion* rather than a person already lying still.
+- **Rule-based detectors** (running, brandishing) are inherently false-positive-prone — e.g. a crouching person read as running, or a hand near an object read as brandishing.
+- **Class-label flicker** occurs between visually similar object classes, and reflective surfaces can occasionally register a mirrored person as real.
+
+**Improvement is a constant, ongoing process** — models are refined as more real-world data is collected, hard negatives are added, and detectors are retrained and tuned. Accuracy is the roadmap, not a finished line.
+
 ---
 
 ## The story behind it
-
 <!-- [Link your narrative post here once written — the "why I built this" story for non-technical readers] -->
 Read the story of how and why I built this → coming soon .....
