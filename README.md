@@ -94,7 +94,7 @@ This is a **working prototype**, not a production product. The infrastructure is
 - Detector accuracy is at prototype stage: models are trained largely on public datasets, so real-world false positives (and misses) still occur and are an ongoing tuning effort. This is the normal data-and-tuning long game of the field, not a limit of the architecture.
 - Infrastructure is proven; accuracy is the undergoing long-term priority roadmap.
 
-**Model limitations (honest state)**
+**Model limitations**
 - **Weapon detection** performs best in conditions close to its training data. Small, partially hidden, or oddly angled weapons — and low light or cluttered outdoor scenes — reduce accuracy.
 - **Fighting detection** is the least mature model: it needs two or more people in frame to be meaningful and still requires score smoothing and further training to be reliable.
 - **Fall detection** handles clear falls well but can be confused by occluded lower bodies and unusual postures; it detects the *falling motion* rather than a person already lying still.
