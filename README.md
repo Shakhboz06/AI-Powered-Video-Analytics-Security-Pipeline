@@ -92,11 +92,11 @@ This is a **working prototype**, not a production product.
 
 - Live analysis is available **Mon–Fri, 10:00–16:00 (Berlin time)** — the GPU is scheduled to control cost. Outside these hours, uploads return no results.
 - Detector accuracy is at prototype stage: models are trained largely on public datasets, so real-world false positives (and misses) still occur and are an ongoing tuning effort. This is the normal data-and-tuning long game of the field, not a limit of the architecture.
-- Infrastructure is proven; accuracy is the roadmap.
+- Infrastructure is proven; accuracy is the undergoing long-term priority roadmap.
 
 ---
 
 ## The story behind it
 
 <!-- [Link your narrative post here once written — the "why I built this" story for non-technical readers] -->
-Read the story of how and why I built this → [coming soon]
+Read the story of how and why I built this → coming soon .....
