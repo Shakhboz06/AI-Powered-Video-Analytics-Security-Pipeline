@@ -69,12 +69,12 @@ The system is built as independent services communicating through a message queu
 
 ## Tech stack
 
-**ML / inference:** Python, PyTorch, Ultralytics YOLO (detection + ByteTrack), pose estimation, custom weapon model, LSTM fall classifier, I3D fight recognition
-**Services:** Go / Gin
-**Streaming & data:** Apache Kafka, TimescaleDB (PostgreSQL 17), Redis
-**Storage:** Supabase (private buckets, signed URLs)
-**Frontend:** Nuxt 4 / Vue
-**Infra:** Docker & Docker Compose, OVH VPS,  GPU, APScheduler
+- **ML / inference:** Python, PyTorch, Ultralytics YOLO (detection + ByteTrack), pose estimation, custom weapon model, LSTM fall classifier, I3D fight recognition
+- **Services:** Go / Gin
+- **Streaming & data:** Apache Kafka, TimescaleDB, Redis
+- **Storage:** Supabase (private buckets, signed URLs)
+- **Frontend:** Nuxt 4 / Vue
+** Infra:** Docker & Docker Compose, OVH VPS, Kubernutes, GPU, APScheduler
 
 ---
 
