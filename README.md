@@ -29,32 +29,7 @@ Every alert captures a clean evidence frame with the detection drawn on it, stor
 
 The system is built as independent services communicating through a message queue, so any single part can fail or restart without taking the rest down.
 
-```
-                       ┌─────────────────────────────────────────────┐
-   Camera (RTSP)  ─────┤                                             │
-   via edge bridge     │   Ingestor  →  Kafka (video.analysis)        │
-                       │                     │                       │
-   Video upload   ─────┤                     ▼                       │
-                       │              GPU Worker (Python)             │
-                       │        YOLO detection + tracking,            │
-                       │        pose, weapon, fall, fight models      │
-                       │                     │                       │
-                       │        Kafka (video.results)                 │
-                       │                     ▼                       │
-                       │            Aggregator (Go)                   │
-                       │     alert logic + zone/behaviour rules       │
-                       │              │            │                  │
-                       │              ▼            ▼                  │
-                       │      TimescaleDB       Redis                 │
-                       │              │            │                  │
-                       │              ▼            ▼                  │
-                       │      Dashboard API (Go/Gin)  →  Nuxt frontend│
-                       └─────────────────────────────────────────────┘
-
-   Evidence frames  →  Supabase private storage  →  signed URLs
-   GPU worker is provisioned on-demand (Vast.ai) by a scheduler,
-   Mon–Fri 10:00–16:00 Berlin time, then torn down to save cost.
-```
+![Screenshot](diagram.png)
 
 **Key components**
 
